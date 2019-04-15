@@ -6,7 +6,8 @@ ENV GOSU_VERSION 1.11
 RUN set -ex; \
 apt-get update \
 && apt-get install -y --no-install-recommends \
-	apt-utils gnupg dirmngr curl wget ca-certificates apt-transport-https locales \
+	apt-utils gnupg dirmngr curl wget ca-certificates apt-transport-https \
+	locales procps \
 && wget -O /usr/local/bin/gosu "https://github.com/tianon/gosu/releases/download/$GOSU_VERSION/gosu-$(dpkg --print-architecture)" \
 && wget -O /usr/local/bin/gosu.asc "https://github.com/tianon/gosu/releases/download/$GOSU_VERSION/gosu-$(dpkg --print-architecture).asc" \
 && export GNUPGHOME="$(mktemp -d)" \
@@ -24,7 +25,7 @@ apt-get update \
 && env _EDGEDB_INSTALL_SKIP_BOOTSTRAP=1 apt-get install -y edgedb-${version} \
 && apt-get remove -y apt-utils gnupg dirmngr wget curl apt-transport-https \
 && apt-get purge -y --auto-remove \
-&& rm -rf /var/lib/apt/lists/* \
+&& rm -rf /var/lib/apt/lists/*
 
 ENV LANG en_US.utf8
 ENV VERSION ${version}
