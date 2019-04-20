@@ -26,7 +26,7 @@ if [ "$1" = 'edgedb-server' ]; then
 	if ! [ "$(ls -A ${EDGEDB_DATADIR})" ]; then
 		shopt -s dotglob
 
-		rm -r /var/run/edgedb/*
+		rm -rf /var/run/edgedb/*
 		echo "Bootstrapping EdgeDB instance..."
 		env EDGEDB_DEBUG_SERVER=1 edgedb-server -b -p5656
 		socket="/var/run/edgedb/.s.EDGEDB.5656"
