@@ -1,5 +1,6 @@
 FROM debian:stretch-slim
 ARG version
+ARG subdist
 
 ENV GOSU_VERSION 1.11
 
@@ -20,7 +21,7 @@ apt-get update \
 	&& gosu nobody true \
 && localedef -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8\
 && (curl https://packages.edgedb.com/keys/edgedb.asc | apt-key add -) \
-&& echo deb https://packages.edgedb.com/apt stretch main \
+&& echo deb https://packages.edgedb.com/apt stretch${subdist} main \
         >/etc/apt/sources.list.d/edgedb.list \
 && apt-get update \
 && env _EDGEDB_INSTALL_SKIP_BOOTSTRAP=1 apt-get install -y edgedb-${version} \
