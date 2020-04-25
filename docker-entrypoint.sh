@@ -45,7 +45,7 @@ if [ "${1}" = 'edgedb-server' -a "$#" -eq 1 ]; then
 		fi
 
 		edgedb --admin -u edgedb configure \
-			insert auth --method=trust --priority=0
+			insert Auth --method=Trust --priority=0
 		edgedb --admin -u edgedb configure \
 			set listen_addresses "0.0.0.0"
 

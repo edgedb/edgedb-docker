@@ -1,4 +1,4 @@
-FROM debian:stretch-slim
+FROM debian:buster-slim
 ARG version
 ARG subdist
 
@@ -17,11 +17,13 @@ RUN set -ex; export DEBIAN_FRONTEND=noninteractive; \
     try=$(( $try + 1 )); sleep 1; done) \
 && localedef -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8\
 && (curl https://packages.edgedb.com/keys/edgedb.asc | apt-key add -) \
-&& echo deb https://packages.edgedb.com/apt stretch${subdist} main \
+&& echo deb https://packages.edgedb.com/apt buster${subdist} main \
         >/etc/apt/sources.list.d/edgedb.list \
 && (try=1; while [ $try -le 5 ]; do apt-get update && break || true; \
     try=$(( $try + 1 )); sleep 1; done) \
-&& (try=1; while [ $try -le 5 ]; do env _EDGEDB_INSTALL_SKIP_BOOTSTRAP=1 apt-get install -y edgedb-${version} && break || true; \
+&& (try=1; while [ $try -le 5 ]; do \
+    env _EDGEDB_INSTALL_SKIP_BOOTSTRAP=1 \
+    apt-get install -y edgedb-${version} edgedb-cli && break || true; \
     try=$(( $try + 1 )); sleep 1; done) \
 && apt-get remove -y apt-utils gnupg dirmngr wget curl apt-transport-https \
 && apt-get purge -y --auto-remove \
