@@ -13,7 +13,7 @@ RUN set -ex; export DEBIAN_FRONTEND=noninteractive; \
 && (try=1; while [ $try -le 5 ]; do \
     apt-get install -y --no-install-recommends \
         apt-utils gnupg dirmngr curl wget ca-certificates apt-transport-https \
-        locales procps gosu && break || true; \
+        locales procps gosu git && break || true; \
     try=$(( $try + 1 )); sleep 1; done) \
 && localedef -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8\
 && (curl https://packages.edgedb.com/keys/edgedb.asc | apt-key add -) \
@@ -27,16 +27,19 @@ RUN set -ex; export DEBIAN_FRONTEND=noninteractive; \
     try=$(( $try + 1 )); sleep 1; done) \
 && apt-get remove -y apt-utils gnupg dirmngr wget curl apt-transport-https \
 && apt-get purge -y --auto-remove \
-&& rm -rf /var/lib/apt/lists/*
+&& rm -rf /var/lib/apt/lists/* \
+&& adduser 
 
 ENV LANG en_US.utf8
 ENV VERSION ${version}
 ENV EDGEDB_DATADIR /var/lib/edgedb/data
 
 EXPOSE 5656
+EXPOSE 6565
+EXPOSE 18888
+EXPOSE 18080
 
 VOLUME /var/lib/edgedb/data
 
-COPY docker-entrypoint.sh /usr/local/bin/
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["edgedb-server"]
