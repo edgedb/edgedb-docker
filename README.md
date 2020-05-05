@@ -31,13 +31,17 @@ $ docker run -it -p 15656:5656 \
 > -p 5656:5656 -p 6565:16565 -p 16565:16565 \
 > -p 18888:18888 -p 8888:8888 edgedb:<edgedbver> bash
 # Or as a one-liner (see Appendix 1)
-root@e3fd91361668:/# apt-get update && apt-get install -y git wget curl 
 root@e3fd91361668:/# adduser edbpool
-root@e3fd91361668:/# su edbpool
-$ cd ~ && git clone https://github.com/dmgolembiowski/edbpool.git
-$ cd edbpool
-$ /bin/bash docker-mock-scripts/phase_1/pyenv_installer.sh
-$ exec bash
+root@e3fd91361668:/# chown -R edbpool:edbpool /srv/edbpool
+root@e3fd91361668:/# ln -s /srv/edbpool /home/edbpool/edbpool
+root@e3fd91361668:/# su edbpool 
+edbpool@e3fd91361668:/$ cd ~/edbpool
+edbpool@e3fd91361668:/home/edbpool/edbpool/$ bash docker-mock-scripts/phase_1/pyenv_installer.sh
+edbpool@e3fd91361668:/home/edbpool/edbpool/$ exec bash
+edbpool@e3fd91361668:/home/edbpool/edbpool/$ pyenv install 3.8-dev
+edbpool@e3fd91361668:/home/edbpool/edbpool/$ 
+
+$ /bin/bash $ exec bash
 $ pyenv install 3.8-dev
 $ pyenv shell 3.8-dev
 $ pip install -U pip wheel
@@ -47,4 +51,11 @@ $ python3 docker-mock-scripts/phase_2/rpc-server.py "docker-mock-scripts/config.
 
 ### Appendix
 > 1: docker run -it -p 15656:5656 -p 5656:5656 -p 6565:16565 -p 16565:16565 -p 18888:18888 -p 8888:8888 edgedb:1-alpha2 bash
+<!--
+### Markup Junk
+edbpool@e3fd91361668:/home/edbpool/edbpool/$
+edbpool@e3fd91361668:/home/edbpool/edbpool/$
+edbpool@e3fd91361668:/home/edbpool/edbpool/$
 
+
+-->
