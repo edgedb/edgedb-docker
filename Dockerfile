@@ -13,10 +13,10 @@ RUN set -ex; export DEBIAN_FRONTEND=noninteractive; \
 && (try=1; while [ $try -le 5 ]; do \
     apt-get install -y --no-install-recommends \
         cmake apt-utils gnupg dirmngr curl wget ca-certificates apt-transport-https \
-        locales procps gosu git gcc \
+        locales procps gosu git gcc logrotate nginx uvicorn \
         build-essential libssl-dev zlib1g-dev libbz2-dev \
         libreadline-dev libsqlite3-dev llvm libncurses5-dev libncursesw5-dev \
-        xz-utils tk-dev libffi-dev liblzma-dev python-openssl \
+        xz-utils tk-dev libffi-dev liblzma-dev python-openssl python3-openssl \
         python3-dev python3-venv && break || true; \
     try=$(( $try + 1 )); sleep 1; done) \
 && localedef -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8\
