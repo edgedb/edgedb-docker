@@ -27,7 +27,7 @@ RUN set -ex; export DEBIAN_FRONTEND=noninteractive; \
     try=$(( $try + 1 )); sleep 1; done) \
 && apt-get remove -y apt-utils gnupg dirmngr wget curl apt-transport-https \
 && apt-get purge -y --auto-remove \
-&& rm -rf /var/lib/apt/lists/*
+&& rm -rf /var/lib/apt/lists/* 
 
 ENV LANG en_US.utf8
 ENV VERSION ${version}
