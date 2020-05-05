@@ -13,7 +13,7 @@ RUN set -ex; export DEBIAN_FRONTEND=noninteractive; \
 && (try=1; while [ $try -le 5 ]; do \
     apt-get install -y --no-install-recommends \
         cmake apt-utils gnupg dirmngr curl wget ca-certificates apt-transport-https \
-        locales procps gosu git gcc logrotate nginx uvicorn \
+        locales procps gosu git gcc logrotate uvicorn \
         build-essential libssl-dev zlib1g-dev libbz2-dev \
         libreadline-dev libsqlite3-dev llvm libncurses5-dev libncursesw5-dev \
         xz-utils tk-dev libffi-dev liblzma-dev python-openssl python3-openssl \
@@ -42,7 +42,7 @@ EXPOSE 16565
 EXPOSE 18888
 
 VOLUME /var/lib/edgedb/data
-COPY . /srv/edbpool
-COPY modules/edgedb-docker/docker-entrypoint.sh /usr/local/bin
-ENTRYPOINT ["modules/edgedb-docker/docker-entrypoint.sh"]
+
+COPY docker-entrypoint.sh /usr/local/bin
+ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["edgedb-server"]
