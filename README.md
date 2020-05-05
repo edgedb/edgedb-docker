@@ -46,6 +46,5 @@ $ python3 docker-mock-scripts/phase_2/rpc-server.py "docker-mock-scripts/config.
 ```
 
 ### Appendix
-> 1: docker run -it -p 15656:5656 5656:5656 6565:16565 16565:16565 18888:18888 8888:8888 edgedb:1-alpha2 bash
-
+> 1: docker run -it -p 15656:5656 -p 5656:5656 -p 6565:16565 -p 16565:16565 -p 18888:18888 -p 8888:8888 edgedb:1-alpha2 bash
 
