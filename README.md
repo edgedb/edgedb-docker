@@ -28,8 +28,8 @@ follow these steps:
 
 ```bash
 $ docker run -it -p 15656:5656 \
-> 5656:5656 6565:16565 16565:16565 \
-> 18888:18888 8888:8888 edgedb:<edgedbver> bash
+> -p 5656:5656 -p 6565:16565 -p 16565:16565 \
+> -p 18888:18888 -p 8888:8888 edgedb:<edgedbver> bash
 # Or as a one-liner (see Appendix 1)
 root@e3fd91361668:/# apt-get update && apt-get install -y git wget curl 
 root@e3fd91361668:/# adduser edbpool
