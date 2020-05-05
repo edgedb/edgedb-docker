@@ -8,7 +8,11 @@ $ docker build -t edgedb:<edgedbver> --build-arg version=<edgedbver> .
 ```
 
 Where `<edgedbver>` is the version of EdgeDB available for Debian 9, and
-might resemble `1-alpha2`.
+might resemble `1-alpha2`. If this holds true for you, then run:
+
+```bash
+$ docker build -t edgedb:1-alpha2 --build-arg version=1-alpha2 .
+```
 
 The container exposes the TCP/IP ports 5656, 6565, 8888, and the `/var/lib/edgedb/data`
 as the persistent data volume. If you are already using these ports locally,
