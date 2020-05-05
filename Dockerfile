@@ -42,7 +42,8 @@ EXPOSE 16565
 EXPOSE 18888
 
 VOLUME /var/lib/edgedb/data
-
 COPY docker-entrypoint.sh /usr/local/bin
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["edgedb-server"]
+RUN chmod 776 /srv/
+
