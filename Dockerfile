@@ -42,7 +42,7 @@ EXPOSE 16565
 EXPOSE 18888
 
 VOLUME /var/lib/edgedb/data
-COPY ../../../edbpool /srv/edbpool
-COPY docker-entrypoint.sh /usr/local/bin
-ENTRYPOINT ["docker-entrypoint.sh"]
+COPY . /srv/edbpool
+COPY modules/edgedb-docker/docker-entrypoint.sh /usr/local/bin
+ENTRYPOINT ["modules/edgedb-docker/docker-entrypoint.sh"]
 CMD ["edgedb-server"]
