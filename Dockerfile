@@ -39,5 +39,6 @@ EXPOSE 8888
 
 VOLUME /var/lib/edgedb/data
 
+COPY docker-entrypoint.sh /usr/local/bin
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["edgedb-server"]
