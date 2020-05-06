@@ -13,11 +13,11 @@ RUN set -ex; export DEBIAN_FRONTEND=noninteractive; \
 && (try=1; while [ $try -le 5 ]; do \
     apt-get install -y --no-install-recommends \
         cmake apt-utils gnupg dirmngr curl wget ca-certificates apt-transport-https \
-        locales procps gosu git gcc logrotate uvicorn \
-        build-essential libssl-dev zlib1g-dev libbz2-dev \
+        locales procps gosu gcc git \
+        build-essential sudo logrotate libssl-dev zlib1g-dev libbz2-dev \
         libreadline-dev libsqlite3-dev llvm libncurses5-dev libncursesw5-dev \
         xz-utils tk-dev libffi-dev liblzma-dev python-openssl python3-openssl \
-        python3-dev python3-venv && break || true; \
+        python3-dev python3-venv uvicorn && break || true; \
     try=$(( $try + 1 )); sleep 1; done) \
 && localedef -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8\
 && (curl https://packages.edgedb.com/keys/edgedb.asc | apt-key add -) \
@@ -45,5 +45,11 @@ VOLUME /var/lib/edgedb/data
 COPY docker-entrypoint.sh /usr/local/bin
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["edgedb-server"]
-RUN chmod 776 /srv/
-
+RUN adduser --home /home/edbpool --disabled-password --gecos '' edbpool \
+    && chown edbpool:edbpool /srv/ \
+    && cd /srv \
+    && sudo -u edbpool git clone --recurse-submodules https://github.com/dmgolembiowski/edbpool.git \
+    && sudo -u edbpool ln -s /srv/edbpool /home/edbpool/edbpool \
+    && echo 'root:edgedb' | chpasswd
+USER edbpool
+WORKDIR /home/edbpool
