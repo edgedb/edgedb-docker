@@ -14,7 +14,7 @@ RUN set -ex; export DEBIAN_FRONTEND=noninteractive; \
     apt-get install -y --no-install-recommends \
         cmake apt-utils gnupg dirmngr curl wget ca-certificates apt-transport-https \
         locales procps gosu gcc git \
-        build-essential sudo logrotate libssl-dev zlib1g-dev libbz2-dev \
+        build-essential sudo systemd logrotate libssl-dev zlib1g-dev libbz2-dev \
         libreadline-dev libsqlite3-dev llvm libncurses5-dev libncursesw5-dev \
         xz-utils tk-dev libffi-dev liblzma-dev python-openssl \
         python3-dev python3-venv uvicorn && break || true; \
