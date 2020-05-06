@@ -16,7 +16,7 @@ RUN set -ex; export DEBIAN_FRONTEND=noninteractive; \
         locales procps gosu gcc git \
         build-essential sudo logrotate libssl-dev zlib1g-dev libbz2-dev \
         libreadline-dev libsqlite3-dev llvm libncurses5-dev libncursesw5-dev \
-        xz-utils tk-dev libffi-dev liblzma-dev python-openssl python3-openssl \
+        xz-utils tk-dev libffi-dev liblzma-dev python-openssl \
         python3-dev python3-venv uvicorn && break || true; \
     try=$(( $try + 1 )); sleep 1; done) \
 && localedef -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8\
@@ -27,8 +27,9 @@ RUN set -ex; export DEBIAN_FRONTEND=noninteractive; \
     try=$(( $try + 1 )); sleep 1; done) \
 && (try=1; while [ $try -le 5 ]; do \
     env _EDGEDB_INSTALL_SKIP_BOOTSTRAP=1 \
-    apt-get install -y edgedb-${version} edgedb-common edgedb-cli && break || true; \
-    try=$(( $try + 1 )); sleep 1; done)
+    apt-get install -y edgedb-${version} && \
+    apt-get install -y edgedb-cli && break || true; \
+    try=$(( $try + 1 )); sleep 1; done) 
 
 ENV LANG en_US.utf8
 ENV VERSION ${version}
