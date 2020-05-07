@@ -28,7 +28,7 @@ if [ "${1}" = 'edgedb-server' -a "$#" -eq 1 ]; then
 
 		rm -rf /var/run/edgedb/*
 		echo "Bootstrapping EdgeDB instance..."
-		env EDGEDB_DEBUG_SERVER=1 edgedb-server -b -P5656
+		env EDGEDB_DEBUG_SERVER=1 edgedb-server-1-alpha2 -b -P5656
 		socket="/var/run/edgedb/.s.EDGEDB.5656"
 
 		try=1
