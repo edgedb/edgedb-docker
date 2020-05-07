@@ -48,6 +48,14 @@ Then execute:
 ```bash
 docker exec -it <container_id> bash
 ```
+To disconnect at some point during your interactive terminal session, you can use the escape sequence
+<kbd>Ctrl</kbd>+<kbd>P</kbd> followed by <kbd>Ctrl</kbd>+<kbd>Q</kbd>. More details [here](https://docs.docker.com/engine/reference/commandline/attach/).
+<br />
+Additional info from [this source](https://groups.google.com/forum/#!msg/docker-user/nWXAnyLP9-M/kbv-FZpF4rUJ)
+ * docker run -t -i → can be detached with `^P^Q`and reattached with docker attach
+ * docker run -i → cannot be detached with `^P^Q`; will disrupt stdin
+ * docker run → cannot be detached with `^P^Q`; can SIGKILL client; can reattach with docker attach
+<br />
 The remaining manual steps can be completed as follows:
 ```bash
 root@e3fd91361668:/# su edbpool 
