@@ -56,7 +56,9 @@ Additional info from [this source](https://groups.google.com/forum/#!msg/docker-
  * docker run -i → cannot be detached with `^P^Q`; will disrupt stdin
  * docker run → cannot be detached with `^P^Q`; can SIGKILL client; can reattach with docker attach
 <br />
+
 The remaining manual steps can be completed as follows:
+
 ```bash
 root@e3fd91361668:/# su edbpool 
 edbpool@e3fd91361668:/$ cd ~/edbpool
@@ -71,11 +73,14 @@ edbpool@e3fd91361668:/home/edbpool/edbpool/$ source bin/activate
 ```
 
 To confirm that your virtual local proxies are working properly, it is useful to run:
+
 ```bash
 (edbpool)$ python3 -m http.server 18888
 ```
+
 Then from a terminal (or internet browser) outside of the docker container, you can navigate to 
 [the HTTP server](http://0.0.0.0:18888) or execute:
+
 ```bash
 user@home:/$ wget -O- http://0.0.0.0:18888
 # or
@@ -83,6 +88,7 @@ user@home:/$ curl -6 http://0.0.0.0:18888
 ```
 
 > Future steps:
+
 ```bash
 edbpool@e3fd91361668:/home/edbpool/edbpool/$ python3 docker-mock-scripts/phase_2/rpc-server.py "docker-mock-scripts/config.json"
 edbpool@e3fd91361668:/home/edbpool/edbpool/$ 
