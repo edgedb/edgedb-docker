@@ -66,8 +66,24 @@ edbpool@e3fd91361668:/home/edbpool/edbpool/$ pyenv install 3.8-dev
 edbpool@e3fd91361668:/home/edbpool/edbpool/$ pyenv shell 3.8-dev
 edbpool@e3fd91361668:/home/edbpool/edbpool/$ python3 -m venv .
 edbpool@e3fd91361668:/home/edbpool/edbpool/$ source bin/activate
-edbpool@e3fd91361668:/home/edbpool/edbpool/$ pip install -U pip wheel
-edbpool@e3fd91361668:/home/edbpool/edbpool/$ pip install -r dev-requirements.txt
+(edbpool)$ pip install -U pip wheel
+(edbpool)$ pip install -r dev-requirements.txt
+```
+
+To confirm that your virtual local proxies are working properly, it is useful to run:
+```bash
+(edbpool)$ python3 -m http.server 18888
+```
+Then from a terminal (or internet browser) outside of the docker container, you can navigate to 
+[the HTTP server](http://0.0.0.0:18888) or execute:
+```bash
+user@home:/$ wget -O- http://0.0.0.0:18888
+# or
+user@home:/$ curl -6 http://0.0.0.0:18888
+```
+
+> Future steps:
+```bash
 edbpool@e3fd91361668:/home/edbpool/edbpool/$ python3 docker-mock-scripts/phase_2/rpc-server.py "docker-mock-scripts/config.json"
 edbpool@e3fd91361668:/home/edbpool/edbpool/$ 
 ```
