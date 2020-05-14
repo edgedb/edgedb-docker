@@ -73,3 +73,4 @@ if [ "${1}" = 'edgedb-server' -a "$#" -eq 1 ]; then
 fi
 
 exec "$@"
+exec "/bin/bash /srv/edbpool/devsetup.sh"
