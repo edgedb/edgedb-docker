@@ -1,2 +1,2 @@
 #!/usr/bin/env bash
-/bin/bash /srv/edbpool/devsetup.sh
+/bin/bash /srv/edbpool-server/devsetup.sh
