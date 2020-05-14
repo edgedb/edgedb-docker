@@ -55,9 +55,8 @@ CMD ["edgedb-server"]
 RUN adduser --home /home/edbpool --disabled-password --gecos '' edbpool \
     && chown edbpool:edbpool /srv/ \
     && cd /srv \
-    && sudo -u edbpool git clone --recurse-submodules https://github.com/dmgolembiowski/edbpool.git \
-    && cd /srv/edbpool && sudo -u edbpool git submodule foreach git pull origin master \
+    && sudo -u edbpool git clone --recurse-submodules https://github.com/dmgolembiowski/edbpool-server.git \
+    && cd /srv/edbpool-server && sudo -u edbpool git submodule foreach git pull origin master \
     && sudo -u edbpool ln -s /srv/edbpool /home/edbpool/edbpool \
     && echo 'root:edgedb' | chpasswd
-#RUN adduser --home /home/edgedb --disabled-password --gecos '' edgedb \
-#    && echo 'edgedb:edgedb' | chpasswd
+
