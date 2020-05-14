@@ -95,12 +95,7 @@ edbpool@e3fd91361668:/home/edbpool/edbpool/$
 ```
 
 ### Appendix
-> 1: docker run -it -p 15656:5656 -p 5656:5656 -p 6565:16565 -p 16565:16565 -p 18888:18888 -p 8888:8888 edgedb:1-alpha2 bash
-<!--
-### Markup Junk
-edbpool@e3fd91361668:/home/edbpool/edbpool/$ 
-edbpool@e3fd91361668:/home/edbpool/edbpool/$ 
-edbpool@e3fd91361668:/home/edbpool/edbpool/$ 
-
-
--->
+>-1: sudo su
+> 0: docker build -t edgedb:1-alpha2 --build-arg version=1-alpha2 .
+> 1: docker run -it -d -p 15656:5656 -p 5656:5656 -p 6565:16565 -p 16565:16565 -p 18888:18888 -p 8888:8888 edgedb:1-alpha2
+> 2: docker ps -a 
