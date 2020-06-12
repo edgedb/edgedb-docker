@@ -7,13 +7,17 @@ if [ "${1:0:1}" = '-' ]; then
 fi
 
 if [ "${1}" = 'edgedb-server' ] && [ "$(id -u)" = '0' ]; then
-	mkdir -p "${EDGEDB_DATADIR}"
-	chown -R edgedb "${EDGEDB_DATADIR}"
-	chmod 700 "${EDGEDB_DATADIR}"
+	if [ -n "${EDGEDB_DATADIR}" ]; then
+		mkdir -p "${EDGEDB_DATADIR}"
+		chown -R edgedb "${EDGEDB_DATADIR}"
+		chmod 700 "${EDGEDB_DATADIR}"
 
-	mkdir -p /var/run/edgedb
-	chown -R edgedb /var/run/edgedb
-	chmod 775 /var/run/edgedb
+		mkdir -p /var/run/edgedb
+		chown -R edgedb /var/run/edgedb
+		chmod 775 /var/run/edgedb
+	else
+		unset EDGEDB_DATADIR
+	fi
 
 	exec gosu edgedb "$BASH_SOURCE" "$@"
 fi
