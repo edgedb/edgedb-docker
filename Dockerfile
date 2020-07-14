@@ -25,6 +25,7 @@ RUN set -ex; export DEBIAN_FRONTEND=noninteractive; \
     env _EDGEDB_INSTALL_SKIP_BOOTSTRAP=1 \
     apt-get install -y edgedb-${version} edgedb-cli && break || true; \
     try=$(( $try + 1 )); sleep 1; done) \
+&& ln -s /usr/bin/edgedb-server-${version} /usr/bin/edgedb-server \
 && apt-get remove -y apt-utils gnupg dirmngr wget curl apt-transport-https \
 && apt-get purge -y --auto-remove \
 && rm -rf /var/lib/apt/lists/*
