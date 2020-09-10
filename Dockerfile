@@ -7,24 +7,41 @@ ENV GOSU_VERSION 1.11
 SHELL ["/bin/bash", "-c"]
 
 RUN set -ex; export DEBIAN_FRONTEND=noninteractive; \
-(try=1; while [ $try -le 5 ]; do \
-    apt-get update && break || true; \
-    try=$(( $try + 1 )); sleep 1; done) \
-&& (try=1; while [ $try -le 5 ]; do \
-    apt-get install -y --no-install-recommends \
-        apt-utils gnupg dirmngr curl wget ca-certificates apt-transport-https \
-        locales procps gosu && break || true; \
-    try=$(( $try + 1 )); sleep 1; done) \
+( \
+    for i in $(seq 1 5); do [ $i -gt 1 ] && sleep 1; \
+        apt-get update \
+    && s=0 && break || s=$?; done; exit $s \
+) \
+&& ( \
+    for i in $(seq 1 5); do [ $i -gt 1 ] && sleep 1; \
+        apt-get install -y --no-install-recommends \
+            apt-utils \
+            gnupg \
+            dirmngr \
+            curl \
+            wget ca-certificates \
+            apt-transport-https \
+            locales \
+            procps \
+            gosu \
+    && s=0 && break || s=$?; done; exit $s \
+) \
 && localedef -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8\
 && (curl https://packages.edgedb.com/keys/edgedb.asc | apt-key add -) \
 && echo deb https://packages.edgedb.com/apt buster${subdist} main \
         >/etc/apt/sources.list.d/edgedb.list \
-&& (try=1; while [ $try -le 5 ]; do apt-get update && break || true; \
-    try=$(( $try + 1 )); sleep 1; done) \
-&& (try=1; while [ $try -le 5 ]; do \
-    env _EDGEDB_INSTALL_SKIP_BOOTSTRAP=1 \
-    apt-get install -y edgedb-${version} edgedb-cli && break || true; \
-    try=$(( $try + 1 )); sleep 1; done) \
+&& ( \
+    for i in $(seq 1 5); do [ $i -gt 1 ] && sleep 1; \
+        apt-get update \
+    && s=0 && break || s=$?; done; exit $s \
+) \
+&& ( \
+    for i in $(seq 1 5); do [ $i -gt 1 ] && sleep 1; \
+        env _EDGEDB_INSTALL_SKIP_BOOTSTRAP=1 apt-get install -y \
+            edgedb-${version} \
+            edgedb-cli \
+    && s=0 && break || s=$?; done; exit $s \
+) \
 && ln -s /usr/bin/edgedb-server-${version} /usr/bin/edgedb-server \
 && apt-get remove -y apt-utils gnupg dirmngr wget curl apt-transport-https \
 && apt-get purge -y --auto-remove \
