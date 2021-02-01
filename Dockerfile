@@ -57,4 +57,4 @@ VOLUME /var/lib/edgedb/data
 
 COPY docker-entrypoint.sh /usr/local/bin/
 ENTRYPOINT ["docker-entrypoint.sh"]
-CMD ["edgedb-server"]
+CMD ["edgedb-server", "--bind-address=0.0.0.0"]
