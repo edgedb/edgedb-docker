@@ -1,0 +1,29 @@
+name: Run Nightly Tests
+
+on:
+  schedule:
+    - cron: "0 0 * * *"
+  repository_dispatch:
+    types: ["test"]
+  push:
+  pull_request:
+
+jobs:
+
+  nightly-test:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    strategy:
+      max-parallel: 4
+      matrix:
+        os: [ubuntu-latest]
+    steps:
+      - uses: actions/checkout@master
+      - name: Install packages
+        run: sudo apt-get install -y bats jq parallel
+      - name: Install edgedb CLI
+        uses: edgedb/setup-edgedb@v1
+        with:
+          cli-version: nightly
+      - name: Run tests
+        run: bats tests/*.bats
