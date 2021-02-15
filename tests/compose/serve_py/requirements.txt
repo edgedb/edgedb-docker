@@ -1,0 +1,2 @@
+aiohttp==3.7.3
+edgedb==0.13.0a3
