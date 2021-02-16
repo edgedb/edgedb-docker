@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
-set -Exeo pipefail
+set -Eeo pipefail
+if [[ -n "$EDGEDB_DOCKER_TRACE" ]]; then
+    set -x
+fi
 
 DIR=/docker-entrypoint.d
 
