@@ -1,2 +1,2 @@
-aiohttp==3.7.3
+aiohttp==3.7.4
 edgedb==0.13.0a3
