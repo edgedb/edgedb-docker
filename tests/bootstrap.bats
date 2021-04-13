@@ -15,7 +15,7 @@ teardown() {
         echo "--- CONTAINER: $cont ---"
         docker logs "$cont"
     done
-    if [[ ${#containers[@]} ]]; then
+    if [ ${#containers[@]} -gt 0 ]; then
         docker rm -f "${containers[@]}"
     fi
 }
