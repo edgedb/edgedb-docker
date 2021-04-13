@@ -49,7 +49,6 @@ RUN set -ex; export DEBIAN_FRONTEND=noninteractive; \
 
 ENV LANG en_US.utf8
 ENV VERSION ${version}
-ENV EDGEDB_DATADIR /var/lib/edgedb/data
 
 EXPOSE 5656
 
@@ -57,4 +56,4 @@ VOLUME /var/lib/edgedb/data
 
 COPY docker-entrypoint.sh /usr/local/bin/
 ENTRYPOINT ["docker-entrypoint.sh"]
-CMD ["edgedb-server", "--bind-address=0.0.0.0"]
+CMD ["edgedb-server"]
