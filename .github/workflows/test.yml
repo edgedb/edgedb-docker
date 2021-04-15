@@ -1,16 +1,21 @@
-name: Run Nightly Tests
+name: Run Tests
 
 on:
   schedule:
     - cron: "0 0 * * *"
-  repository_dispatch:
-    types: ["test"]
+  workflow_dispatch:
+    inputs: {}
   push:
+    branches:
+      - master
+      - ci
   pull_request:
+    branches:
+      - '*'
 
 jobs:
 
-  nightly-test:
+  test:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 40
     strategy:
