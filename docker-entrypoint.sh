@@ -16,13 +16,16 @@ edbdocker_main() {
     set -- edgedb-server "$@"
   fi
 
-  edbdocker_parse_args "$@"
-
-  if [ "$_EDBDOCKER_SHOW_HELP" = "1" -o "$1" != "edgedb-server" ]; then
-    # `edgedb-server --help` or any other command goes straight to execution.
+  if ["$1" != "edgedb-server"]; then
     exec "$@"
   else
-    edbdocker_run_server "$@"
+    edbdocker_parse_args "$@"
+    if [ "$_EDBDOCKER_SHOW_HELP" = "1" ]; then
+      # `edgedb-server --help` goes straight to execution.
+      exec "$@"
+    else
+      edbdocker_run_server "$@"
+    fi
   fi
 }
 
@@ -74,6 +77,22 @@ edbdocker_parse_args() {
         ;;
       --bind-address=*)
         export EDGEDB_BIND_ADDRESS="${1#*=}"
+        shift
+        ;;
+      --bootstrap-command)
+        _edbdocker_parse_arg "EDGEDB_BOOTSTRAP_COMMAND" "$1" "$2"
+        shift 2
+        ;;
+      --bootstrap-command=*)
+        export EDGEDB_BOOTSTRAP_COMMAND="${1#*=}"
+        shift
+        ;;
+      --bootstrap-script)
+        _edbdocker_parse_arg "EDGEDB_BOOTSTRAP_SCRIPT_FILE" "$1" "$2"
+        shift 2
+        ;;
+      --bootstrap-script=*)
+        export EDGEDB_BOOTSTRAP_SCRIPT_FILE="${1#*=}"
         shift
         ;;
       *)
