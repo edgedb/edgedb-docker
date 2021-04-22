@@ -16,7 +16,7 @@ edbdocker_main() {
     set -- edgedb-server "$@"
   fi
 
-  if ["$1" != "edgedb-server"]; then
+  if [ "$1" != "edgedb-server" ]; then
     exec "$@"
   else
     edbdocker_parse_args "$@"
