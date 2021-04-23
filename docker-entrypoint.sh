@@ -145,7 +145,7 @@ edbdocker_run_server() {
 
   if [ "$(id -u)" = "0" ]; then
     # if we are root, restart as "edgedb"
-    exec gosu edgedb env _EDBDOCKER_RESTARTED=1 "$BASH_SOURCE" "$@"
+    exec gosu edgedb env _EDBDOCKER_RESTARTED=1 "${BASH_SOURCE[-1]}" "$@"
   fi
 
   if [ -n "${EDGEDB_DATADIR:-}" ]; then
@@ -625,9 +625,14 @@ edbdocker_run_temp_server() {
 }
 
 
+# https://unix.stackexchange.com/a/215279
+_is_sourced() {
+  [ "${#FUNCNAME[@]}" -ge 2 ] && [ "${FUNCNAME[1]}" = "source" ]
+}
+
 # Allow this script to be sourced without any side-effects other than
 # making the functions available in the sourcing script.
-if [ "${#FUNCNAME[@]}" -ge 1 ] && [ "${FUNCNAME[1]}" = "source" ]; then
+if _is_sourced; then
   :
 else
   edbdocker_main "$@"
