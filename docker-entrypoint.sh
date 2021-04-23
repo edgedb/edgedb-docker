@@ -131,6 +131,9 @@ _edbdocker_parse_arg() {
 #       `edbdocker_run_server`.
 # Usage: edbdocker_run_server edgedb-server --arg=val --arg1=val2 ...
 edbdocker_run_server() {
+  local ran_bootstrap
+  ran_bootstrap=""
+
   if [ -z "$_EDBDOCKER_RESTARTED" ]; then
     if [ -d "/docker-entrypoint.d" ]; then
       /bin/run-parts --verbose "/docker-entrypoint.d"
@@ -148,12 +151,16 @@ edbdocker_run_server() {
   if [ -n "${EDGEDB_DATADIR:-}" ]; then
     if [ -z "$(ls -A "${EDGEDB_DATADIR}")" ]; then
       edbdocker_bootstrap_instance
+      ran_bootstrap="1"
     fi
   elif ! edbdocker_remote_cluster_is_initialized "${EDGEDB_POSTGRES_DSN}"; then
     edbdocker_bootstrap_instance
+    ran_bootstrap="1"
   fi
 
-  edbdocker_run_migrations
+  if [ -z "$ran_bootstrap" ]; then
+    edbdocker_run_migrations
+  fi
 
   local server_args=(
     --bind-address="$EDGEDB_BIND_ADDRESS"
@@ -413,6 +420,10 @@ _edbdocker_bootstrap_cb() {
       edbdocker_log "Bootstrap script $filename"
       cat "$filename" | edgedb "${conn_opts[@]}"
     done
+  fi
+
+  if [ -d "/dbschema" ] && [ -z "${EDGEDB_SKIP_MIGRATIONS:-}" ]; then
+    _edbdocker_migrations_cb "${conn_opts[@]}"
   fi
 }
 
