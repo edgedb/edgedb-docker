@@ -302,12 +302,6 @@ edbdocker_bootstrap_instance() {
 
   bootstrap_opts=( "$@" )
 
-  if [ -n "${EDGEDB_POSTGRES_DSN}" ]; then
-    bootstrap_opts+=(--postgres-dsn="${EDGEDB_POSTGRES_DSN}")
-  else
-    bootstrap_opts+=(--data-dir="${EDGEDB_DATADIR}")
-  fi
-
   if [ -n "${EDGEDB_BOOTSTRAP_SCRIPT_FILE}" ]; then
     if ! [ -e "${EDGEDB_BOOTSTRAP_SCRIPT_FILE}" ]; then
       edbdocker_die "ERROR: the file specified by EDGEDB_BOOTSTRAP_SCRIPT_FILE (${EDGEDB_BOOTSTRAP_SCRIPT_FILE}) does not exist."
@@ -432,6 +426,8 @@ _edbdocker_bootstrap_abort_cb() {
   if [ -n "${EDGEDB_DATADIR}" ] && [ -e "${EDGEDB_DATADIR}" ]; then
     (shopt -u nullglob; rm -rf "${EDGEDB_DATADIR}/"* || :)
   fi
+
+  edbdocker_die "$1"
 }
 
 
@@ -444,20 +440,10 @@ _edbdocker_bootstrap_abort_cb() {
 # Usage: `EDGEDB_DATADIR=/foo/bar edbdocker_run_migrations`
 edbdocker_run_migrations() {
   if [ -d "/dbschema" ] && [ -z "${EDGEDB_SKIP_MIGRATIONS:-}" ]; then
-    local server_opts
-
-    server_opts=()
-    if [ -n "${EDGEDB_POSTGRES_DSN}" ]; then
-      server_opts+=(--postgres-dsn="${EDGEDB_POSTGRES_DSN}")
-    else
-      server_opts+=(--data-dir="${EDGEDB_DATADIR}")
-    fi
-
     edbdocker_log "Applying schema migrations..."
     edbdocker_run_temp_server \
       _edbdocker_migrations_cb \
-      _edbdocker_migrations_abort_cb \
-      "${server_opts[@]}"
+      _edbdocker_migrations_abort_cb
   fi
 }
 
@@ -471,7 +457,7 @@ _edbdocker_migrations_cb() {
 
 
 _edbdocker_migrations_abort_cb() {
-  :
+  edbdocker_die "$1"
 }
 
 
@@ -510,11 +496,19 @@ edbdocker_run_temp_server() {
   local server_opts
   local conn_opts
   local callback
+  local result
 
+  result=0
   callback="$1"
   abort_callback="$2"
   shift 2
   server_opts=( "${@}" )
+
+  if [ -n "${EDGEDB_POSTGRES_DSN}" ]; then
+    server_opts+=(--postgres-dsn="${EDGEDB_POSTGRES_DSN}")
+  else
+    server_opts+=(--data-dir="${EDGEDB_DATADIR}")
+  fi
 
   runstate_dir="$(mktemp -d)"
   server_opts+=(
@@ -525,18 +519,20 @@ edbdocker_run_temp_server() {
   conn_opts=( --admin --host="$runstate_dir" --wait-until-available="2s" )
 
   # Start the server
-  edgedb-server "${server_opts[@]}" &
+  "${EDGEDB_SERVER_BINARY:-edgedb-server}" "${server_opts[@]}" &
   edgedb_pid="$!"
 
   timeout=120
   retry_period=5
 
   function _abort() {
-    $abort_callback
     if [ -e "${runstate_dir}" ]; then
       rm -r "${runstate_dir}" || :
     fi
-    edbdocker_die "$1"
+    if [ -n "${abort_callback}" ]; then
+      $abort_callback "$1"
+    fi
+    result=1
   }
 
   (
@@ -588,9 +584,12 @@ edbdocker_run_temp_server() {
     # to a trailing sleep above.
     wait "$timeout_pid"
     ecode=$?
+  else
+    kill "$timeout_pid"
   fi
   if [ $ecode -ne 0 ]; then
     _abort "ERROR: Could not bootstrap EdgeDB server instance."
+    return $ecode
   fi
   set -e
 
@@ -601,11 +600,16 @@ edbdocker_run_temp_server() {
 
   if [ -z "${port}" ]; then
     _abort "ERROR: EdgeDB server seems to have died before bootstrap could complete."
+    return 1
   fi
 
   conn_opts+=( --port="${port}" )
 
-  $callback "${conn_opts[@]}"
+  if [ -n "${callback}" ]; then
+    if ! $callback "${conn_opts[@]}"; then
+      result=$?
+    fi
+  fi
 
   shell_pid=$$
   trap "_abort" 10
@@ -622,6 +626,8 @@ edbdocker_run_temp_server() {
   trap - 10
 
   rm -r "${runstate_dir}" || :
+
+  return $resuit
 }
 
 
