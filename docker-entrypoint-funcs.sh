@@ -136,7 +136,7 @@ edbdocker_run_entrypoint_parts() {
 
 edbdocker_bootstrap_needed() {
   if [ -n "${EDGEDB_POSTGRES_DSN}" ]; then
-    edbdocker_remote_cluster_is_initialized "${EDGEDB_POSTGRES_DSN}"
+    ! edbdocker_remote_cluster_is_initialized "${EDGEDB_POSTGRES_DSN}"
   else
     [ -z "$(ls -A "${EDGEDB_DATADIR}")" ]
   fi
