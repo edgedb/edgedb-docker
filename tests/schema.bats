@@ -25,8 +25,8 @@ teardown() {
     containers+=($container_id)
     # The user declared here is ignored
     docker run -d --name=$container_id --publish=5656 \
-        --env=EDGEDB_USER=user1 \
-        --env=EDGEDB_PASSWORD=password2 \
+        --env=EDGEDB_SERVER_USER=user1 \
+        --env=EDGEDB_SERVER_PASSWORD=password2 \
         edgedb-test:schema
     port=$(docker inspect "$container_id" \
         | jq -r '.[0].NetworkSettings.Ports["5656/tcp"][0].HostPort')

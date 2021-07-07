@@ -5,7 +5,7 @@ services:
       context: .
       dockerfile: dockerfiles/Dockerfile.edgedb
     environment:
-    - &pwd EDGEDB_PASSWORD=some-password
+    - &pwd EDGEDB_SERVER_PASSWORD=some-password
   python:
     build:
       context: .

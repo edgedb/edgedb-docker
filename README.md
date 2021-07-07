@@ -33,11 +33,11 @@ EdgeDB servers.
 The simplest way to run the image (without data persistence) is this:
 
 ```shell
-$ docker run --name edgedb -e EDGEDB_PASSWORD=secret -d edgedb/edgedb
+$ docker run --name edgedb -e EDGEDB_SERVER_PASSWORD=secret -d edgedb/edgedb
 ```
 
 See the [Customization](#customization) section below for the meaning of
-the `EDGEDB_PASSWORD` variable and other options.
+the `EDGEDB_SERVER_PASSWORD` variable and other options.
 
 Now, to open an interactive shell to the database instance run this:
 
@@ -46,17 +46,17 @@ $ docker run -it --rm --link=edgedb edgedb/edgedb-cli -H edgedb --password
 ```
 
 When the CLI prompts for a password, enter the value passed in the
-`EDGEDB_PASSWORD` variable when starting the server container.
+`EDGEDB_SERVER_PASSWORD` variable when starting the server container.
 
 ## Data Persistence
 
 If you want the contents of the database to survive container restarts,
 you must mount a persistent volume at the path specified by
-`EDGEDB_DATADIR` (`/var/lib/edgedb/data`) by default.  For example:
+`EDGEDB_SERVER_DATADIR` (`/var/lib/edgedb/data`) by default.  For example:
 
 ```shell
 $ docker run \
-    --name edgedb -e EDGEDB_PASSWORD=secret \
+    --name edgedb -e EDGEDB_SERVER_PASSWORD=secret \
     -v /my/data/directory:/var/lib/edgedb/data \
     -d edgedb/edgedb
 ```
@@ -66,20 +66,20 @@ Note that on Windows you must use a Docker volume instead:
 ```shell
 $ docker volume create --name=edgedb-data
 $ docker run \
-    --name edgedb -e EDGEDB_PASSWORD=secret \
+    --name edgedb -e EDGEDB_SERVER_PASSWORD=secret \
     -v edgedb-data:/var/lib/edgedb/data \
     -d edgedb/edgedb
 ```
 
 It is also possible to run an `edgedb` container on a remote PostgreSQL
-cluster specified by `EDGEDB_POSTGRES_DSN`.  See below for details.
+cluster specified by `EDGEDB_SERVER_POSTGRES_DSN`.  See below for details.
 
 ## Schema Migrations
 
 A derived image may include application schema and migrations in
 `/dbschema`, in which case the container will attempt to apply the
 schema migrations found in `/dbschema/migrations`, unless
-the `EDGEDB_SKIP_MIGRATIONS` environment variable is set.
+the `EDGEDB_SERVER_SKIP_MIGRATIONS` environment variable is set.
 
 ## Customization
 
@@ -96,42 +96,43 @@ The following environment variables affect the bootstrap only and have no
 effect on subsequent container runs. The `_FILE` variants of the variables
 allow passing the value via a file mounted inside a container.
 
-#### `EDGEDB_PASSWORD`, `EDGEDB_PASSWORD_FILE`
+#### `EDGEDB_SERVER_PASSWORD`, `EDGEDB_SERVER_PASSWORD_FILE`
 
 Determines the password used for the default superuser account.
 
-#### `EDGEDB_PASSWORD_HASH`, `EDGEDB_PASSWORD_HASH_FILE`
+#### `EDGEDB_SERVER_PASSWORD_HASH`, `EDGEDB_SERVER_PASSWORD_HASH_FILE`
 
-A variant of `EDGEDB_PASSWORD`, where the specified value is a hashed password
-verifier instead of plain text.
+A variant of `EDGEDB_SERVER_PASSWORD`, where the specified value is a hashed
+password verifier instead of plain text.
 
-#### `EDGEDB_USER`, `EDGEDB_USER_FILE`
+#### `EDGEDB_SERVER_USER`, `EDGEDB_SERVER_USER_FILE`
 
 Optionally specifies the name of the default superuser account. Defaults to
 `edgedb` if not specified.
 
-#### `EDGEDB_DATABASE`, `EDGEDB_DATABASE_FILE`
+#### `EDGEDB_SERVER_DATABASE`, `EDGEDB_SERVER_DATABASE_FILE`
 
 Optionally specifies the name of a default database that is created during
 bootstrap. Defaults to `edgedb` if not specified.
 
-#### `EDGEDB_AUTH_METHOD`
+#### `EDGEDB_SERVER_AUTH_METHOD`
 
 Optionally specifies the authentication method used by the server instance.
 Supported values are `"scram"` (the default) and `"trust"`.  When set to
 `"trust"`, the database will allow complete unauthenticated access for all
-who have access to the database port.  In this case the `EDGEDB_PASSWORD`
+who have access to the database port.  In this case the `EDGEDB_SERVER_PASSWORD`
 (or equivalent) setting is not required.
 
 Use at your own risk and only for testing.
 
-#### `EDGEDB_BOOTSTRAP_COMMAND`, `EDGEDB_BOOTSTRAP_SCRIPT_FILE`
+#### `EDGEDB_SERVER_BOOTSTRAP_COMMAND`, `EDGEDB_SERVER_BOOTSTRAP_SCRIPT_FILE`
 
 Specifies one or more EdgeQL statements to run at bootstrap. If specified,
-overrides `EDGEDB_PASSWORD`, `EDGEDB_PASSWORD_HASH`, `EDGEDB_USER` and
-`EDGEDB_DATABASE`. Useful to fine-tune initial user and database creation,
-and other initial setup. If neither the `EDGEDB_BOOTSTRAP_COMMAND` variable
-or the `EDGEDB_BOOTSTRAP_SCRIPT_FILE` are explicitly specified, the container
+overrides `EDGEDB_SERVER_PASSWORD`, `EDGEDB_SERVER_PASSWORD_HASH`,
+`EDGEDB_SERVER_USER` and `EDGEDB_SERVER_DATABASE`. Useful to fine-tune initial
+user and database creation, and other initial setup. If neither the
+`EDGEDB_SERVER_BOOTSTRAP_COMMAND` variable or the
+`EDGEDB_SERVER_BOOTSTRAP_SCRIPT_FILE` are explicitly specified, the container
 will look for the presence of `/edgedb-bootstrap.edgeql` in the container
 (which can be placed in a derived image).
 
@@ -149,39 +150,39 @@ section above, the configuration documented below applies to all container
 invocations.  It can be specified either as environment variables or
 command-line arguments.
 
-#### `EDGEDB_PORT`, `--port`
+#### `EDGEDB_SERVER_PORT`, `--port`
 
 Specifies the network port on which EdgeDB will listen inside the container.
 The default is `5656`.  This usually doesn't need to be changed unless you
 run in `host` networking mode.
 
-#### `EDGEDB_BIND_ADDRESS`, `--bind-address`
+#### `EDGEDB_SERVER_BIND_ADDRESS`, `--bind-address`
 
 Specifies the network interface on which EdgeDB will listen inside the
 container.  The default is `0.0.0.0`, which means all interfaces.  This
 usually doesn't need to be changed unless you run in `host` networking mode.
 
-#### `EDGEDB_DATADIR`, `--data-dir`
+#### `EDGEDB_SERVER_DATADIR`, `--data-dir`
 
 Specifies a path within the container in which the database files are located.
 Defaults to `/var/run/edgedb/data`.  The container needs to be able to
 change the ownership of the mounted directory to `edgedb`.  Cannot be specified
-at the same time with `EDGEDB_POSTGRES_DSN`.
+at the same time with `EDGEDB_SERVER_POSTGRES_DSN`.
 
-#### `EDGEDB_POSTGRES_DSN`, `EDGEDB_POSTGRES_DSN_FILE`, `--postgres-dsn`
+#### `EDGEDB_SERVER_POSTGRES_DSN`, `EDGEDB_SERVER_POSTGRES_DSN_FILE`, `--postgres-dsn`
 
 Specifies a PostgreSQL connection string in the
 [URI format](https://www.postgresql.org/docs/13/libpq-connect.html#id-1.7.3.8.3.6).
 If set, the PostgreSQL cluster specified by the URI is used instead of the
 builtin PostgreSQL server.  Cannot be specified at the same time with
-`EDGEDB_DATADIR`.
+`EDGEDB_SERVER_DATADIR`.
 
-#### `EDGEDB_RUNSTATE_DIR`, `--runstate-dir`
+#### `EDGEDB_SERVER_RUNSTATE_DIR`, `--runstate-dir`
 
 Specifies a path within the container in which EdgeDB will place its Unix
 socket and other transient files.
 
-#### `EDGEDB_EXTRA_ARGS`, `--extra-arg, ...`
+#### `EDGEDB_SERVER_EXTRA_ARGS`, `--extra-arg, ...`
 
 Extra arguments to be passed to EdgeDB server.
 
