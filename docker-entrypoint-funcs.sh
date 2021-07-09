@@ -27,7 +27,13 @@ edbdocker_run_regular_command() {
 
 # Parse server arguments and populate environment variables accordingly.
 # Arguments override environment variables.
+_EDGEDB_DOCKER_CMDLINE_ARGS=()
+
 edbdocker_parse_args() {
+  if [ "${1:0:1}" != '-' ]; then
+    shift
+  fi
+
   while [[ $# -gt 0 ]]; do
     case "$1" in
       -h|--help)
@@ -90,7 +96,12 @@ edbdocker_parse_args() {
         export EDGEDB_BOOTSTRAP_SCRIPT_FILE="${1#*=}"
         shift
         ;;
+      --bootstrap-only)
+        export EDGEDB_BOOTSTRAP_ONLY="1"
+        shift
+        ;;
       *)
+        _EDGEDB_DOCKER_CMDLINE_ARGS+=( "$1" )
         shift
         ;;
     esac
@@ -144,7 +155,13 @@ edbdocker_bootstrap_needed() {
 
 
 edbdocker_run_server() {
-  local server_args=(
+  local server_args
+
+  if [ -n "${EDGEDB_BOOTSTRAP_ONLY}" ]; then
+    return
+  fi
+
+  server_args=(
     --bind-address="$EDGEDB_BIND_ADDRESS"
     --port="$EDGEDB_PORT"
   )
@@ -155,14 +172,18 @@ edbdocker_run_server() {
     server_args+=( --data-dir="${EDGEDB_DATADIR}" )
   fi
 
-  if [ "${1:0:1}" = '-' ]; then
-    set -- edgedb-server "$@"
+  if [ -n "${EDGEDB_RUNSTATE_DIR}" ]; then
+    server_args+=( --runstate-dir="${EDGEDB_RUNSTATE_DIR}" )
   fi
 
+  server_args+=( "${_EDGEDB_DOCKER_CMDLINE_ARGS[@]}" )
+
+  set -- edgedb-server "${server_args[@]}" ${EDGEDB_EXTRA_ARGS}
+
   if [ "$(id -u)" = "0" ]; then
-    exec gosu "${EDGEDB_SERVER_UID}" "$@" ${EDGEDB_EXTRA_ARGS} "${server_args[@]}"
+    exec gosu "${EDGEDB_SERVER_UID}" "$@"
   else
-    exec "$@" ${EDGEDB_EXTRA_ARGS} "${server_args[@]}"
+    exec "$@"
   fi
 }
 
