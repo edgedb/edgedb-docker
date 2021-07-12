@@ -50,7 +50,7 @@ teardown() {
     [[ ${lines[-1]} = "21" ]]
 }
 
-@test "create role manually" {
+@test "create role manually (via env)" {
     container_id="edb_dock_$(uuidgen)"
     containers+=($container_id)
     docker run -d --name=$container_id --publish=5656 \
@@ -59,6 +59,21 @@ teardown() {
     port=$(docker inspect "$container_id" \
         | jq -r '.[0].NetworkSettings.Ports["5656/tcp"][0].HostPort')
     output=$(echo test4 | edgedb --wait-until-available=120s -P$port \
+        -u test1 --password-from-stdin \
+        query "SELECT 7*4")
+    run echo "$output"
+    [[ ${lines[-1]} = "28" ]]
+}
+
+@test "create role manually (via cmdline)" {
+    container_id="edb_dock_$(uuidgen)"
+    containers+=($container_id)
+    docker run -d --name=$container_id --publish=5656 \
+        edgedb/edgedb:latest \
+        --bootstrap-command="CREATE SUPERUSER ROLE test1 { SET password := 'test5'; };"
+    port=$(docker inspect "$container_id" \
+        | jq -r '.[0].NetworkSettings.Ports["5656/tcp"][0].HostPort')
+    output=$(echo test5 | edgedb --wait-until-available=120s -P$port \
         -u test1 --password-from-stdin \
         query "SELECT 7*4")
     run echo "$output"
