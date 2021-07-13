@@ -6,8 +6,11 @@ ENV GOSU_VERSION 1.11
 
 SHELL ["/bin/bash", "-c"]
 
-RUN set -ex; export DEBIAN_FRONTEND=noninteractive; \
-( \
+RUN set -Eeo pipefail; shopt -s dotglob inherit_errexit nullglob; \
+export DEBIAN_FRONTEND=noninteractive; \
+(test -n "${version}" || \
+  (echo ">>> ERROR: missing required 'version' build-arg" >&2 && exit 1)) \
+&& ( \
     for i in $(seq 1 5); do [ $i -gt 1 ] && sleep 1; \
         apt-get update \
     && s=0 && break || s=$?; done; exit $s \
@@ -54,7 +57,6 @@ EXPOSE 5656
 
 VOLUME /var/lib/edgedb/data
 
-COPY docker-entrypoint-funcs.sh /usr/local/bin/
-COPY docker-entrypoint.sh /usr/local/bin/
+COPY docker-entrypoint-funcs.sh docker-entrypoint.sh /usr/local/bin/
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["edgedb-server"]
