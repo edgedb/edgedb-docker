@@ -100,6 +100,10 @@ edbdocker_parse_args() {
         export EDGEDB_BOOTSTRAP_ONLY="1"
         shift
         ;;
+      --generate-self-signed-cert)
+        export EDGEDB_GENERATE_SELF_SIGNED_CERT="1"
+        shift
+        ;;
       *)
         _EDGEDB_DOCKER_CMDLINE_ARGS+=( "$1" )
         shift
@@ -375,6 +379,10 @@ edbdocker_bootstrap_instance() {
     fi
 
     bootstrap_opts+=( --bootstrap-command="$bootstrap_cmd" )
+  fi
+
+  if [ -n "${EDGEDB_GENERATE_SELF_SIGNED_CERT}" ]; then
+    bootstrap_opts+=(--generate-self-signed-cert)
   fi
 
   if [ -n "${EDGEDB_POSTGRES_DSN}" ]; then
