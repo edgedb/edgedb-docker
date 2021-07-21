@@ -105,19 +105,19 @@ edbdocker_parse_args() {
         shift
         ;;
       --tls-cert-file)
-        _edbdocker_parse_arg "EDGEDB_CERT_FILE" "$1" "$2"
+        _edbdocker_parse_arg "EDGEDB_TLS_CERT_FILE" "$1" "$2"
         shift 2
         ;;
       --tls-cert-file=*)
-        export EDGEDB_CERT_FILE="${1#*=}"
+        export EDGEDB_TLS_CERT_FILE="${1#*=}"
         shift
         ;;
       --tls-key-file)
-        _edbdocker_parse_arg "EDGEDB_KEY_FILE" "$1" "$2"
+        _edbdocker_parse_arg "EDGEDB_TLS_KEY_FILE" "$1" "$2"
         shift 2
         ;;
       --tls-key-file=*)
-        export EDGEDB_KEY_FILE="${1#*=}"
+        export EDGEDB_TLS_KEY_FILE="${1#*=}"
         shift
         ;;
       --emit-server-status)
@@ -214,19 +214,19 @@ edbdocker_run_server() {
         _edbdocker_watch_cert &
       fi
     fi
-  elif [ -n "${EDGEDB_CERT_FILE}" ] || [ -n "${EDGEDB_KEY_FILE}" ]; then
-    if [ -n "${EDGEDB_CERT_FILE}" ]; then
-      server_args+=(--tls-cert-file="${EDGEDB_CERT_FILE}")
+  elif [ -n "${EDGEDB_TLS_CERT_FILE}" ] || [ -n "${EDGEDB_TLS_KEY_FILE}" ]; then
+    if [ -n "${EDGEDB_TLS_CERT_FILE}" ]; then
+      server_args+=(--tls-cert-file="${EDGEDB_TLS_CERT_FILE}")
     fi
-    if [ -n "${EDGEDB_KEY_FILE}" ]; then
-      server_args+=(--tls-key-file="${EDGEDB_KEY_FILE}")
+    if [ -n "${EDGEDB_TLS_KEY_FILE}" ]; then
+      server_args+=(--tls-key-file="${EDGEDB_TLS_KEY_FILE}")
     fi
   elif [ -z "${EDGEDB_DATADIR}" ] || [ ! -f "${EDGEDB_DATADIR}/edbtlscert.pem" ]; then
     msg=(
       "ERROR: EdgeDB requires a TLS certificate and corresponding      "
       "       private key to start. Please either provide your own     "
-      "       through environment variables EDGEDB_CERT_FILE and       "
-      "       EDGEDB_KEY_FILE, or set EDGEDB_GENERATE_SELF_SIGNED_CERT "
+      "       through environment variables EDGEDB_TLS_CERT_FILE and   "
+      "       EDGEDB_TLS_KEY_FILE, or set EDGEDB_GENERATE_SELF_SIGNED_CERT "
       "       for automatic certificate generation.                    "
       "                                                                "
       "       For example:                                             "
@@ -279,12 +279,12 @@ edbdocker_setup_env() {
     edbdocker_die "ERROR: EDGEDB_BOOTSTRAP_SCRIPT_FILE and EDGEDB_BOOTSTRAP_COMMAND are mutually exclusive, but both are set"
   fi
 
-  if [ -n "${EDGEDB_CERT_FILE:-}" ] && [ -n "${EDGEDB_GENERATE_SELF_SIGNED_CERT:-}" ]; then
-    edbdocker_die "ERROR: EDGEDB_CERT_FILE and EDGEDB_GENERATE_SELF_SIGNED_CERT are mutually exclusive, but both are set"
+  if [ -n "${EDGEDB_TLS_CERT_FILE:-}" ] && [ -n "${EDGEDB_GENERATE_SELF_SIGNED_CERT:-}" ]; then
+    edbdocker_die "ERROR: EDGEDB_TLS_CERT_FILE and EDGEDB_GENERATE_SELF_SIGNED_CERT are mutually exclusive, but both are set"
   fi
 
-  if [ -n "${EDGEDB_KEY_FILE:-}" ] && [ -n "${EDGEDB_GENERATE_SELF_SIGNED_CERT:-}" ]; then
-    edbdocker_die "ERROR: EDGEDB_KEY_FILE and EDGEDB_GENERATE_SELF_SIGNED_CERT are mutually exclusive, but both are set"
+  if [ -n "${EDGEDB_TLS_KEY_FILE:-}" ] && [ -n "${EDGEDB_GENERATE_SELF_SIGNED_CERT:-}" ]; then
+    edbdocker_die "ERROR: EDGEDB_TLS_KEY_FILE and EDGEDB_GENERATE_SELF_SIGNED_CERT are mutually exclusive, but both are set"
   fi
 
   export EDGEDB_RUNSTATE_DIR="${EDGEDB_RUNSTATE_DIR:-/run/edgedb}"
@@ -451,19 +451,19 @@ edbdocker_bootstrap_instance() {
 
   if [ -n "${EDGEDB_GENERATE_SELF_SIGNED_CERT}" ]; then
     bootstrap_opts+=(--generate-self-signed-cert)
-  elif [ -n "${EDGEDB_CERT_FILE}" ] || [ -n "${EDGEDB_KEY_FILE}" ]; then
-    if [ -n "${EDGEDB_CERT_FILE}" ]; then
-      bootstrap_opts+=(--tls-cert-file="${EDGEDB_CERT_FILE}")
+  elif [ -n "${EDGEDB_TLS_CERT_FILE}" ] || [ -n "${EDGEDB_TLS_KEY_FILE}" ]; then
+    if [ -n "${EDGEDB_TLS_CERT_FILE}" ]; then
+      bootstrap_opts+=(--tls-cert-file="${EDGEDB_TLS_CERT_FILE}")
     fi
-    if [ -n "${EDGEDB_KEY_FILE}" ]; then
-      bootstrap_opts+=(--tls-key-file="${EDGEDB_KEY_FILE}")
+    if [ -n "${EDGEDB_TLS_KEY_FILE}" ]; then
+      bootstrap_opts+=(--tls-key-file="${EDGEDB_TLS_KEY_FILE}")
     fi
   elif [ -z "${EDGEDB_DATADIR}" ] || [ ! -f "${EDGEDB_DATADIR}/edbtlscert.pem" ]; then
     msg=(
       "ERROR: EdgeDB requires a TLS certificate and corresponding      "
       "       private key to start. Please either provide your own     "
-      "       through environment variables EDGEDB_CERT_FILE and       "
-      "       EDGEDB_KEY_FILE, or set EDGEDB_GENERATE_SELF_SIGNED_CERT "
+      "       through environment variables EDGEDB_TLS_CERT_FILE and   "
+      "       EDGEDB_TLS_KEY_FILE, or set EDGEDB_GENERATE_SELF_SIGNED_CERT "
       "       for automatic certificate generation.                    "
       "                                                                "
       "       For example:                                             "
