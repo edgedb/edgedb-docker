@@ -24,11 +24,15 @@ teardown() {
     container_id="edb_dock_$(uuidgen)"
     containers+=($container_id)
     # The user declared here is ignored
-    docker run -d --name=$container_id --publish=5656 edgedb-test:bootstrap
+    docker run -d --name=$container_id --publish=5656 \
+        --env=EDGEDB_GENERATE_SELF_SIGNED_CERT=1 \
+        edgedb-test:bootstrap
     port=$(docker inspect "$container_id" \
         | jq -r '.[0].NetworkSettings.Ports["5656/tcp"][0].HostPort')
-    output=$(echo password2 | edgedb --wait-until-available=120s -P$port \
+    echo password2 | edgedb --wait-until-available=120s -P$port \
         -u user1 --password-from-stdin \
+        authenticate --non-interactive _localtest
+    output=$(edgedb -I _localtest \
         --tab-separated query "SELECT Bootstrap.name ORDER BY Bootstrap.name")
     echo "$output"
     run echo "$output"

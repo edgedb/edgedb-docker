@@ -37,25 +37,25 @@ $ docker run --name edgedb -e EDGEDB_PASSWORD=secret \
     -e EDGEDB_GENERATE_SELF_SIGNED_CERT=1 -d edgedb/edgedb
 ```
 
-Find the generated TLS certificate from the log, store it into a file -
-say `cert.pem` - for future usage. For example:
-
-```shell
-$ docker logs -f edgedb 2>&1 | sed '/-----BEGIN/,/-----END/!d;/-----END/q' | tee cert.pem
-```
-
 See the [Customization](#customization) section below for the meaning of
 the `EDGEDB_PASSWORD` variable and other options.
+
+Then authenticate to the EdgeDB instance and store the credentials in
+e.g. a Docker volume:
+
+```shell
+$ docker run --rm --link=edgedb -e EDGEDB_PASSWORD=secret \
+    -v edgedb-cli-config:/.config/edgedb edgedb/edgedb-cli \
+    -H edgedb authenticate --non-interactive my_instance
+```
 
 Now, to open an interactive shell to the database instance run this:
 
 ```shell
-$ docker run -it --rm --link=edgedb -v `pwd`/cert.pem:/tmp/cert.pem \
-    edgedb/edgedb-cli -H edgedb --tls-ca-file /tmp/cert.pem --password
+$ docker run -it --rm --link=edgedb \
+    -v edgedb-cli-config:/.config/edgedb edgedb/edgedb-cli \
+    -I my_instance
 ```
-
-When the CLI prompts for a password, enter the value passed in the
-`EDGEDB_PASSWORD` variable when starting the server container.
 
 ## Data Persistence
 

@@ -27,17 +27,17 @@ teardown() {
     docker run -d --name=$container_id --publish=5656 \
         --env=EDGEDB_USER=user1 \
         --env=EDGEDB_PASSWORD=password2 \
+        --env=EDGEDB_GENERATE_SELF_SIGNED_CERT=1 \
         edgedb-test:schema
     port=$(docker inspect "$container_id" \
         | jq -r '.[0].NetworkSettings.Ports["5656/tcp"][0].HostPort')
     # ensure started
     echo password2 | edgedb --wait-until-available=120s -P$port \
         -u user1 --password-from-stdin \
-        --tab-separated query "SELECT 1"
+        authenticate --non-interactive _localtest
     # wait until migrations are complete
     sleep 3
     # now check that this worked
-    echo password2 | edgedb --wait-until-available=120s -P$port \
-        -u user1 --password-from-stdin \
+    edgedb -I _localtest \
         --tab-separated query "INSERT Item { name := 'hello' }"
 }

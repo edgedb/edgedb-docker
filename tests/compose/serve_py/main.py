@@ -30,7 +30,11 @@ async def app(options):
     app = web.Application()
     app.add_routes([web.get('/read/{name}', read)])
     app.add_routes([web.get('/increment/{name}', increment)])
-    app['edgedb'] = await edgedb.create_async_pool(host='edgedb', wait_until_available=120)
+    app['edgedb'] = await edgedb.create_async_pool(
+        host='edgedb',
+        wait_until_available=120,
+        tls_ca_file='ca.pem',
+    )
     return app
 
 
