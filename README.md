@@ -33,20 +33,29 @@ EdgeDB servers.
 The simplest way to run the image (without data persistence) is this:
 
 ```shell
-$ docker run --name edgedb -e EDGEDB_PASSWORD=secret -d edgedb/edgedb
+$ docker run --name edgedb -e EDGEDB_PASSWORD=secret \
+    -e EDGEDB_GENERATE_SELF_SIGNED_CERT=1 -d edgedb/edgedb
 ```
 
 See the [Customization](#customization) section below for the meaning of
 the `EDGEDB_PASSWORD` variable and other options.
 
+Then authenticate to the EdgeDB instance and store the credentials in
+e.g. a Docker volume:
+
+```shell
+$ docker run --rm --link=edgedb -e EDGEDB_PASSWORD=secret \
+    -v edgedb-cli-config:/.config/edgedb edgedb/edgedb-cli \
+    -H edgedb authenticate --non-interactive my_instance
+```
+
 Now, to open an interactive shell to the database instance run this:
 
+```shell
+$ docker run -it --rm --link=edgedb \
+    -v edgedb-cli-config:/.config/edgedb edgedb/edgedb-cli \
+    -I my_instance
 ```
-$ docker run -it --rm --link=edgedb edgedb/edgedb-cli -H edgedb --password
-```
-
-When the CLI prompts for a password, enter the value passed in the
-`EDGEDB_PASSWORD` variable when starting the server container.
 
 ## Data Persistence
 
@@ -57,6 +66,7 @@ you must mount a persistent volume at the path specified by
 ```shell
 $ docker run \
     --name edgedb -e EDGEDB_PASSWORD=secret \
+    -e EDGEDB_GENERATE_SELF_SIGNED_CERT=1 \
     -v /my/data/directory:/var/lib/edgedb/data \
     -d edgedb/edgedb
 ```
@@ -67,6 +77,7 @@ Note that on Windows you must use a Docker volume instead:
 $ docker volume create --name=edgedb-data
 $ docker run \
     --name edgedb -e EDGEDB_PASSWORD=secret \
+    -e EDGEDB_GENERATE_SELF_SIGNED_CERT=1 \
     -v edgedb-data:/var/lib/edgedb/data \
     -d edgedb/edgedb
 ```
@@ -109,6 +120,22 @@ verifier instead of plain text.
 
 Optionally specifies the name of the default superuser account. Defaults to
 `edgedb` if not specified.
+
+#### `EDGEDB_GENERATE_SELF_SIGNED_CERT`
+
+Set this option to `1` to tell the server to automatically generate a
+self-signed certificate with key file in the `EDGEDB_DATADIR` (if present,
+see below), and echo the certificate content in the logs. If the certificate
+file exists, the server will use it instead of generating a new one.
+
+Self-signed certificates are usually used in development and testing, you
+should likely provide your own certificate and key file with the variables below.
+
+#### `EDGEDB_TLS_CERT_FILE`, `EDGEDB_TLS_KEY_FILE`
+
+Specify your own TLS certificate and key files to run the server. Note, the
+value of these two variables are path inside the Docker container, so you may
+want to mount your certificate files into the container with the `-v` option.
 
 #### `EDGEDB_DATABASE`, `EDGEDB_DATABASE_FILE`
 

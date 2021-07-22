@@ -24,11 +24,14 @@ teardown() {
     docker run -d --name=$container_id --publish=5656 \
         --env=EDGEDB_USER=test1 \
         --env=EDGEDB_PASSWORD=test2 \
+        --env=EDGEDB_GENERATE_SELF_SIGNED_CERT=1 \
         edgedb/edgedb:latest
     port=$(docker inspect "$container_id" \
         | jq -r '.[0].NetworkSettings.Ports["5656/tcp"][0].HostPort')
-    output=$(echo test2 | edgedb --wait-until-available=120s -P$port \
+    echo test2 | edgedb --wait-until-available=120s -P$port \
         -u test1 --password-from-stdin \
+        authenticate --non-interactive _localtest
+    output=$(edgedb -I _localtest \
         query "SELECT 7+7")
     run echo "$output"
     [[ ${lines[-1]} = "14" ]]
@@ -40,11 +43,14 @@ teardown() {
     docker run -d --name=$container_id --publish=5656 \
         --env=EDGEDB_USER=test1 \
         --env='EDGEDB_PASSWORD_HASH=SCRAM-SHA-256$4096:rEQ2xuv6ASCA61VMaqU9yg==$uvda3+u+zewd/GvbIofDjk5EEReNJ0KRhLX0001bVRQ=:sdF5jXfPMnM9GNu+JC39fV4Pa5oZEULEm8cdDRZMJDw=' \
+        --env=EDGEDB_GENERATE_SELF_SIGNED_CERT=1 \
         edgedb/edgedb:latest
     port=$(docker inspect "$container_id" \
         | jq -r '.[0].NetworkSettings.Ports["5656/tcp"][0].HostPort')
-    output=$(echo test3 | edgedb --wait-until-available=120s -P$port \
+    echo test3 | edgedb --wait-until-available=120s -P$port \
         -u test1 --password-from-stdin \
+        authenticate --non-interactive _localtest
+    output=$(edgedb -I _localtest \
         query "SELECT 7*3")
     run echo "$output"
     [[ ${lines[-1]} = "21" ]]
@@ -55,11 +61,14 @@ teardown() {
     containers+=($container_id)
     docker run -d --name=$container_id --publish=5656 \
         --env=EDGEDB_BOOTSTRAP_COMMAND="CREATE SUPERUSER ROLE test1 { SET password := 'test4'; };" \
+        --env=EDGEDB_GENERATE_SELF_SIGNED_CERT=1 \
         edgedb/edgedb:latest
     port=$(docker inspect "$container_id" \
         | jq -r '.[0].NetworkSettings.Ports["5656/tcp"][0].HostPort')
-    output=$(echo test4 | edgedb --wait-until-available=120s -P$port \
+    echo test4 | edgedb --wait-until-available=120s -P$port \
         -u test1 --password-from-stdin \
+        authenticate --non-interactive _localtest
+    output=$(edgedb -I _localtest \
         query "SELECT 7*4")
     run echo "$output"
     [[ ${lines[-1]} = "28" ]]
@@ -70,11 +79,14 @@ teardown() {
     containers+=($container_id)
     docker run -d --name=$container_id --publish=5656 \
         edgedb/edgedb:latest \
+        --generate-self-signed-cert \
         --bootstrap-command="CREATE SUPERUSER ROLE test1 { SET password := 'test5'; };"
     port=$(docker inspect "$container_id" \
         | jq -r '.[0].NetworkSettings.Ports["5656/tcp"][0].HostPort')
-    output=$(echo test5 | edgedb --wait-until-available=120s -P$port \
+    echo test5 | edgedb --wait-until-available=120s -P$port \
         -u test1 --password-from-stdin \
+        authenticate --non-interactive _localtest
+    output=$(edgedb -I _localtest \
         query "SELECT 7*4")
     run echo "$output"
     [[ ${lines[-1]} = "28" ]]
@@ -85,11 +97,14 @@ teardown() {
     containers+=($container_id)
     docker run -d --name=$container_id --publish=5656 \
         --env=EDGEDB_PASSWORD=test2 \
+        --env=EDGEDB_GENERATE_SELF_SIGNED_CERT=1 \
         edgedb/edgedb:latest
     port=$(docker inspect "$container_id" \
         | jq -r '.[0].NetworkSettings.Ports["5656/tcp"][0].HostPort')
-    output=$(echo test2 | edgedb --wait-until-available=120s -P$port \
+    echo test2 | edgedb --wait-until-available=120s -P$port \
         --password-from-stdin \
+        authenticate --non-interactive _localtest
+    output=$(edgedb -I _localtest \
         query "SELECT 7+7")
     run echo "$output"
     [[ ${lines[-1]} = "14" ]]
@@ -100,11 +115,14 @@ teardown() {
     containers+=($container_id)
     docker run -d --name=$container_id --publish=5656 \
         --env='EDGEDB_PASSWORD_HASH=SCRAM-SHA-256$4096:rEQ2xuv6ASCA61VMaqU9yg==$uvda3+u+zewd/GvbIofDjk5EEReNJ0KRhLX0001bVRQ=:sdF5jXfPMnM9GNu+JC39fV4Pa5oZEULEm8cdDRZMJDw=' \
+        --env=EDGEDB_GENERATE_SELF_SIGNED_CERT=1 \
         edgedb/edgedb:latest
     port=$(docker inspect "$container_id" \
         | jq -r '.[0].NetworkSettings.Ports["5656/tcp"][0].HostPort')
-    output=$(echo test3 | edgedb --wait-until-available=120s -P$port \
+    echo test3 | edgedb --wait-until-available=120s -P$port \
         --password-from-stdin \
+        authenticate --non-interactive _localtest
+    output=$(edgedb -I _localtest \
         query "SELECT 7*3")
     run echo "$output"
     [[ ${lines[-1]} = "21" ]]
@@ -117,11 +135,14 @@ teardown() {
         --env=EDGEDB_DATABASE=hello \
         --env=EDGEDB_USER=test1 \
         --env=EDGEDB_PASSWORD=test5 \
+        --env=EDGEDB_GENERATE_SELF_SIGNED_CERT=1 \
         edgedb/edgedb:latest
     port=$(docker inspect "$container_id" \
         | jq -r '.[0].NetworkSettings.Ports["5656/tcp"][0].HostPort')
-    output=$(echo test5 | edgedb --wait-until-available=120s -P$port \
+    echo test5 | edgedb --wait-until-available=120s -P$port \
         -d hello -u test1 --password-from-stdin \
+        authenticate --non-interactive _localtest
+    output=$(edgedb -I _localtest \
         query "SELECT 7+7")
     run echo "$output"
     [[ ${lines[-1]} = "14" ]]
