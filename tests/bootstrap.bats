@@ -1,4 +1,5 @@
 containers=()
+instances=()
 
 setup() {
     slot=$(
@@ -16,13 +17,18 @@ teardown() {
         docker logs "$cont"
     done
     if [ ${#containers[@]} -gt 0 ]; then
-        docker rm -f "${containers[@]}"
+        docker rm -f "${containers[@]}" || :
     fi
+    for instance in "${instances[@]}"; do
+        edgedb instance unlink "${instance}" || :
+    done
 }
 
 @test "full bootstrap" {
-    container_id="edb_dock_$(uuidgen)"
+    container_id="edb_dock_$(uuidgen | sed s/-//g)"
     containers+=($container_id)
+    instance="testinst_$(uuidgen | sed s/-//g)"
+    instances+=($instance)
     # The user declared here is ignored
     docker run -d --name=$container_id --publish=5656 \
         --env=EDGEDB_GENERATE_SELF_SIGNED_CERT=1 \
@@ -31,8 +37,8 @@ teardown() {
         | jq -r '.[0].NetworkSettings.Ports["5656/tcp"][0].HostPort')
     echo password2 | edgedb --wait-until-available=120s -P$port \
         -u user1 --password-from-stdin \
-        authenticate --non-interactive _localtest
-    output=$(edgedb -I _localtest \
+        instance link --trust-tls-cert --non-interactive "${instance}"
+    output=$(edgedb -I "${instance}" \
         --tab-separated query "SELECT Bootstrap.name ORDER BY Bootstrap.name")
     echo "$output"
     run echo "$output"

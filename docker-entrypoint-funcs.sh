@@ -493,18 +493,37 @@ _edbdocker_bootstrap_cb() {
   if [ -z "${EDGEDB_HIDE_GENERATED_CERT}" ]; then
     if [ -n "${EDGEDB_DATADIR}" ] && [ -n "${EDGEDB_GENERATE_SELF_SIGNED_CERT}" ]; then
       msg=(
-        "=============================================================== "
-        "NOTICE: TLS certificate is generated at the following path:     "
-        "            ${EDGEDB_DATADIR}/edbtlscert.pem                    "
+        "================================================================"
+        "                             NOTICE                             "
+        "                             ------                             "
         "                                                                "
-        "        For your convenience, the generated certificate is      "
-        "        echoed below. Please remember to include the BEGIN      "
-        "        and END CERTIFICATE lines, and use this certificate     "
-        "        to establish connections to this EdgeDB instance:       "
-        "=============================================================== "
+        "A TLS certificate has been generated as 'edbtlscert.pem' in the "
+        "server data directory ('${EDGEDB_DATADIR}' in this container).  "
+        "                                                                "
+        "For your convenience, the generated certificate is printed below"
+        "Please remember to include the BEGIN and END CERTIFICATE lines, "
+        "and use this certificate to establish connections to this EdgeDB"
+        "instance.                                                       "
+        "                                                                "
       )
       edbdocker_log "${msg[@]}"
       edbdocker_log "$(cat ${EDGEDB_DATADIR}/edbtlscert.pem)"
+      msg=(
+        "                                                                "
+        "If you have the EdgeDB CLI isntalled on the host system, you can"
+        "also persist the authentication credentials and the certificate "
+        "by running:                                                     "
+        "                                                                "
+        "    edgedb -u ${EDGEDB_USER} --port=<published-port> \          "
+        "        --password instance link --trust-tls-cert my_instance   "
+        "                                                                "
+        "and then connect to it via:                                     "
+        "                                                                "
+        "    edgedb -I my_instance                                       "
+        "                                                                "
+        "================================================================"
+      )
+      edbdocker_log "${msg[@]}"
     fi
   fi
 

@@ -40,13 +40,13 @@ $ docker run --name edgedb -e EDGEDB_PASSWORD=secret \
 See the [Customization](#customization) section below for the meaning of
 the `EDGEDB_PASSWORD` variable and other options.
 
-Then authenticate to the EdgeDB instance and store the credentials in
-e.g. a Docker volume:
+Then, to authenticate to the EdgeDB instance and store the credentials in
+a Docker volume, run:
 
 ```shell
-$ docker run --rm --link=edgedb -e EDGEDB_PASSWORD=secret \
+$ docker run -it --rm --link=edgedb -e EDGEDB_PASSWORD=secret \
     -v edgedb-cli-config:/.config/edgedb edgedb/edgedb-cli \
-    -H edgedb authenticate --non-interactive my_instance
+    -H edgedb instance link my_instance
 ```
 
 Now, to open an interactive shell to the database instance run this:

@@ -1,4 +1,5 @@
 containers=()
+instances=()
 
 setup() {
     slot=$(
@@ -16,13 +17,18 @@ teardown() {
         docker logs "$cont"
     done
     if [[ ${#containers[@]} ]]; then
-        docker rm -f "${containers[@]}"
+        docker rm -f "${containers[@]}" || :
     fi
+    for instance in "${instances[@]}"; do
+        edgedb instance unlink "${instance}" || :
+    done
 }
 
 @test "applying schema" {
-    container_id="edb_dock_$(uuidgen)"
+    container_id="edb_dock_$(uuidgen | sed s/-//g)"
     containers+=($container_id)
+    instance="testinst_$(uuidgen | sed s/-//g)"
+    instances+=($instance)
     # The user declared here is ignored
     docker run -d --name=$container_id --publish=5656 \
         --env=EDGEDB_USER=user1 \
@@ -34,10 +40,10 @@ teardown() {
     # ensure started
     echo password2 | edgedb --wait-until-available=120s -P$port \
         -u user1 --password-from-stdin \
-        authenticate --non-interactive _localtest
+        instance link --trust-tls-cert --non-interactive "${instance}"
     # wait until migrations are complete
     sleep 3
     # now check that this worked
-    edgedb -I _localtest \
+    edgedb -I "${instance}" \
         --tab-separated query "INSERT Item { name := 'hello' }"
 }
