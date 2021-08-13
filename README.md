@@ -131,11 +131,10 @@ file exists, the server will use it instead of generating a new one.
 Self-signed certificates are usually used in development and testing, you
 should likely provide your own certificate and key file with the variables below.
 
-#### `EDGEDB_TLS_CERT_FILE`, `EDGEDB_TLS_KEY_FILE`
+#### `EDGEDB_TLS_CERT`, `EDGEDB_TLS_CERT_FILE`, `EDGEDB_TLS_KEY`, `EDGEDB_TLS_KEY_FILE`
 
-Specify your own TLS certificate and key files to run the server. Note, the
-value of these two variables are path inside the Docker container, so you may
-want to mount your certificate files into the container with the `-v` option.
+The TLS certificate and private key, exclusive with
+`EDGEDB_GENERATE_SELF_SIGNED_CERT`.
 
 #### `EDGEDB_DATABASE`, `EDGEDB_DATABASE_FILE`
 

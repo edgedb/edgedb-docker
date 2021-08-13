@@ -264,6 +264,8 @@ edbdocker_setup_env() {
   edbdocker_lookup_env_var "EDGEDB_PASSWORD"
   edbdocker_lookup_env_var "EDGEDB_PASSWORD_HASH"
   edbdocker_lookup_env_var "EDGEDB_POSTGRES_DSN"
+  edbdocker_lookup_env_var "EDGEDB_TLS_KEY" "" true
+  edbdocker_lookup_env_var "EDGEDB_TLS_CERT" "" true
 
   if [ -n "${EDGEDB_DATADIR:-}" ] && [ -n "${EDGEDB_POSTGRES_DSN:-}" ]; then
     edbdocker_die "ERROR: EDGEDB_DATADIR and EDGEDB_POSTGRES_DSN are mutually exclusive, but both are set"
@@ -292,19 +294,31 @@ edbdocker_setup_env() {
 
 
 # Resolve the value of the specified variable.
-# Usage: edbdocker_lookup_env_var VARNAME [default]
+# Usage: edbdocker_lookup_env_var VARNAME [default] [prefer-file]
 # The function looks for $VARNAME in the environment block directly,
 # and also tries to read the value from ${VARNAME}_FILE, if set.
 # For example, `edbdocker_lookup_env_var EDGEDB_PASSWORD foo` would
 # look for $EDGEDB_PASSWORD, the file specified by $EDGEDB_PASSWORD_FILE,
-# and if neither is set, default to 'foo'.
+# and if neither is set, default to 'foo'.  If *prefer-file* is passed as
+# `true`, then if the value is specified in the environemnt variable,
+# it is written into a temporary file and ${VARNAME}_FILE is set to point
+# to it.
 edbdocker_lookup_env_var() {
-  local var="$1"
-  local file_var="${var}_FILE"
-  local deflt="${2:-}"
-  local val="$deflt"
-  local var_val="${!var:-}"
-  local file_var_val="${!file_var:-}"
+  local var
+  local file_var
+  local deflt
+  local prefer_file
+  local val
+  local var_val
+  local file_var_val
+
+  var="$1"
+  file_var="${var}_FILE"
+  deflt="${2:-}"
+  prefer_file="$3"
+  val="$deflt"
+  var_val="${!var:-}"
+  file_var_val="${!file_var:-}"
 
   if [ -n "${var_val}" ] && [ -n "${file_var_val}" ]; then
     edbdocker_die \
@@ -313,6 +327,13 @@ edbdocker_lookup_env_var() {
 
   if [ -n "${var_val}" ]; then
     val="${var_val}"
+    if [ "${prefer_file}" = "true" ]; then
+      file_var_val=$(mktemp)
+      echo -n "${val}" > "${file_var_val}"
+      if [ "$(id -u)" = "0" ]; then
+        chown "${EDGEDB_SERVER_UID}" "${file_var_val}"
+      fi
+    fi
   elif [ "${file_var_val}" ]; then
     if [ -e "${file_var_val}" ]; then
       val="$(< "${file_var_val}")"
@@ -322,8 +343,13 @@ edbdocker_lookup_env_var() {
     fi
   fi
 
-  export "$var"="$val"
-  unset "$file_var"
+  if [ "${prefer_file}" = "true" ]; then
+    export "$file_var"="$file_var_val"
+    unset "$var"
+  else
+    export "$var"="$val"
+    unset "$file_var"
+  fi
 }
 
 
@@ -447,30 +473,6 @@ edbdocker_bootstrap_instance() {
     fi
 
     bootstrap_opts+=( --bootstrap-command="$bootstrap_cmd" )
-  fi
-
-  if [ -n "${EDGEDB_GENERATE_SELF_SIGNED_CERT}" ]; then
-    bootstrap_opts+=(--generate-self-signed-cert)
-  elif [ -n "${EDGEDB_TLS_CERT_FILE}" ] || [ -n "${EDGEDB_TLS_KEY_FILE}" ]; then
-    if [ -n "${EDGEDB_TLS_CERT_FILE}" ]; then
-      bootstrap_opts+=(--tls-cert-file="${EDGEDB_TLS_CERT_FILE}")
-    fi
-    if [ -n "${EDGEDB_TLS_KEY_FILE}" ]; then
-      bootstrap_opts+=(--tls-key-file="${EDGEDB_TLS_KEY_FILE}")
-    fi
-  elif [ -z "${EDGEDB_DATADIR}" ] || [ ! -f "${EDGEDB_DATADIR}/edbtlscert.pem" ]; then
-    msg=(
-      "ERROR: EdgeDB requires a TLS certificate and corresponding      "
-      "       private key to start. Please either provide your own     "
-      "       through environment variables EDGEDB_TLS_CERT_FILE and   "
-      "       EDGEDB_TLS_KEY_FILE, or set EDGEDB_GENERATE_SELF_SIGNED_CERT "
-      "       for automatic certificate generation.                    "
-      "                                                                "
-      "       For example:                                             "
-      "                                                                "
-      "       $ docker run -e EDGEDB_GENERATE_SELF_SIGNED_CERT=1 edgedb/edgedb"
-    )
-    edbdocker_die "${msg[@]}"
   fi
 
   if [ -n "${EDGEDB_POSTGRES_DSN}" ]; then
@@ -639,6 +641,19 @@ edbdocker_die() {
 }
 
 
+# Check if the server supports a given command-line argument.
+edbdocker_server_supports() {
+  local srv
+  srv="${EDGEDB_SERVER_BINARY:-edgedb-server}"
+
+  if "${srv}" --help | grep -- "$1" >/dev/null; then
+    return 0
+  else
+    return 1
+  fi
+}
+
+
 # Start edgedb-server on a random port, execute the specified callback
 # and shut down the server.
 #
@@ -667,6 +682,32 @@ edbdocker_run_temp_server() {
     server_opts+=(--postgres-dsn="${EDGEDB_POSTGRES_DSN}")
   else
     server_opts+=(--data-dir="${EDGEDB_DATADIR}")
+  fi
+
+  if edbdocker_server_supports "--generate-self-signed-cert"; then
+    if [ -n "${EDGEDB_GENERATE_SELF_SIGNED_CERT}" ]; then
+      server_opts+=(--generate-self-signed-cert)
+    elif [ -n "${EDGEDB_TLS_CERT_FILE}" ] || [ -n "${EDGEDB_TLS_KEY_FILE}" ]; then
+      if [ -n "${EDGEDB_TLS_CERT_FILE}" ]; then
+        server_opts+=(--tls-cert-file="${EDGEDB_TLS_CERT_FILE}")
+      fi
+      if [ -n "${EDGEDB_TLS_KEY_FILE}" ]; then
+        server_opts+=(--tls-key-file="${EDGEDB_TLS_KEY_FILE}")
+      fi
+    elif [ -z "${EDGEDB_DATADIR}" ] || [ ! -f "${EDGEDB_DATADIR}/edbtlscert.pem" ]; then
+      msg=(
+        "ERROR: EdgeDB requires a TLS certificate and corresponding      "
+        "       private key to start. Please either provide your own     "
+        "       through environment variables EDGEDB_TLS_CERT_FILE and   "
+        "       EDGEDB_TLS_KEY_FILE, or set EDGEDB_GENERATE_SELF_SIGNED_CERT "
+        "       for automatic certificate generation.                    "
+        "                                                                "
+        "       For example:                                             "
+        "                                                                "
+        "       $ docker run -e EDGEDB_GENERATE_SELF_SIGNED_CERT=1 edgedb/edgedb"
+      )
+      edbdocker_die "${msg[@]}"
+    fi
   fi
 
   runstate_dir="$(edbdocker_mktemp_for_server -d)"

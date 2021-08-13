@@ -167,3 +167,29 @@ teardown() {
     run echo "$output"
     [[ ${lines[-1]} = "14" ]]
 }
+
+@test "tls in env vars" {
+    container_id="edb_dock_$(uuidgen | sed s/-//g)"
+    containers+=($container_id)
+    instance="testinst_$(uuidgen | sed s/-//g)"
+    instances+=($instance)
+    docker run -d --publish=5656 \
+        --name=$container_id \
+        --env=EDGEDB_DOCKER_TRACE=true \
+        --env=EDGEDB_DATABASE=hello \
+        --env=EDGEDB_USER=test1 \
+        --env=EDGEDB_PASSWORD=test_tls \
+        --env=EDGEDB_TLS_KEY="$(cat tests/compose/certs/server_key.pem)" \
+        --env=EDGEDB_TLS_CERT="$(cat tests/compose/certs/server_cert.pem)" \
+        edgedb/edgedb:latest
+    port=$(docker inspect "$container_id" \
+        | jq -r '.[0].NetworkSettings.Ports["5656/tcp"][0].HostPort')
+    echo test_tls | edgedb --wait-until-available=120s -P$port \
+        -d hello -u test1 --password-from-stdin \
+        --tls-ca-file=tests/compose/certs/ca.pem \
+        instance link --non-interactive "${instance}"
+    output=$(edgedb -I "${instance}" \
+        query "SELECT 7+7")
+    run echo "$output"
+    [[ ${lines[-1]} = "14" ]]
+}
