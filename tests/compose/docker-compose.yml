@@ -1,0 +1,19 @@
+version: "3.3"
+services:
+  edgedb:
+    build:
+      context: .
+      dockerfile: dockerfiles/Dockerfile.edgedb
+    environment:
+    - &pwd EDGEDB_PASSWORD=some-password
+    - EDGEDB_TLS_CERT_FILE=/certs/server_cert.pem
+    - EDGEDB_TLS_KEY_FILE=/certs/server_key.pem
+  python:
+    build:
+      context: .
+      dockerfile: dockerfiles/Dockerfile.py
+    ports:
+    - 34089:80
+    links: [edgedb]
+    environment: [*pwd]
+

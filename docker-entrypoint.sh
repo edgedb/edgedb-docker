@@ -1,13 +1,20 @@
 #!/usr/bin/env bash
 
-#!/bin/bash
+source "/usr/local/bin/docker-entrypoint-funcs.sh"
 
-echo -e "\e[30;48;5;82mEDBPool E-Z Setup\e[0m"
+edbdocker_setup_shell
+edbdocker_parse_args "$@"
 
-if [[ $(id -u) -ne 0 ]]; then
-   echo "This script must be run as root"
-   exit 1
+if ! edbdocker_is_server_command "$@"; then
+  edbdocker_run_regular_command "$@"
+else
+  edbdocker_prepare
+
+  if edbdocker_bootstrap_needed; then
+    edbdocker_bootstrap_instance
+  else
+    edbdocker_run_migrations
+  fi
+
+  edbdocker_run_server "$@"
 fi
-
-echo -e "\e[40;38;5;82mBeginning RPC/Reverse Shell Pipeline:"
-sudo -u edbpool -H bash -c "cd /home/edbpool/edbpool; bash docker-mock-scripts/setup.sh"

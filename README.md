@@ -1,101 +1,219 @@
-Official Dockerfile for EdgeDB
-==============================
+# Official Dockerfile for EdgeDB Server
 
-To build, run:
+## What is EdgeDB?
 
-```bash
-$ docker build -t edgedb:<edgedbver> --build-arg version=<edgedbver> .
+EdgeDB is an **open-source** object-relational database built on top of
+PostgreSQL. The goal of EdgeDB is to _empower_ its users to build safe
+and efficient software with less effort.
+
+EdgeDB features:
+
+- strict, strongly typed schema;
+- powerful and expressive query language;
+- rich standard library;
+- built-in support for schema migrations;
+- native GraphQL support.
+
+See [edgedb.com](https://www.edgedb.com/) and the
+[documentation](https://www.edgedb.com/docs/) for more information about
+EdgeDB and how to get started. This README contains information specifically
+on how to use the EdgeDB server Docker image.
+
+## When to use this image
+
+This image is primarily intended to be used directly when there is a
+requirement to use Docker containers, such as in production, or in a
+development setup that involves multiple containers orchestrated by
+Docker Compose or a similar tool. Otherwise, using the `edgedb server`
+CLI on the host system is the recommended way to install and run
+EdgeDB servers.
+
+## How to use this image
+
+The simplest way to run the image (without data persistence) is this:
+
+```shell
+$ docker run --name edgedb -e EDGEDB_PASSWORD=secret \
+    -e EDGEDB_GENERATE_SELF_SIGNED_CERT=1 -d edgedb/edgedb
 ```
 
-Where `<edgedbver>` is the version of EdgeDB available for Debian 9, and
-might resemble `1-alpha2`. If this holds true for you, then run:
+See the [Customization](#customization) section below for the meaning of
+the `EDGEDB_PASSWORD` variable and other options.
 
-```bash
-$ docker build -t edgedb:1-alpha2 --build-arg version=1-alpha2 .
+Then, to authenticate to the EdgeDB instance and store the credentials in
+a Docker volume, run:
+
+```shell
+$ docker run -it --rm --link=edgedb -e EDGEDB_PASSWORD=secret \
+    -v edgedb-cli-config:/.config/edgedb edgedb/edgedb-cli \
+    -H edgedb instance link my_instance
 ```
 
-The container exposes the TCP/IP ports 5656, 6565, 8888, and the `/var/lib/edgedb/data`
-as the persistent data volume. If you are already using these ports locally,
-you can safely rewrite the Dockerfile to map the following ports to:
-```
-    - 5656 -> 15656
-    - 6565 -> 16565
-    - 8888 -> 18888
-```
+Now, to open an interactive shell to the database instance run this:
 
-Additional setup is required that is not directly handled by the Dockerfile. Please
-follow these steps:
-
-```bash
-$ docker run -it -d --rm \
--p 15656:5656 \
--p 5656:5656 \
--p 6565:16565 \
--p 16565:16565 \
--p 18888:18888 \
--p 8888:8888 edgedb:<edgedbver>
-
-# Or as a one-liner (see Appendix 1)
+```shell
+$ docker run -it --rm --link=edgedb \
+    -v edgedb-cli-config:/.config/edgedb edgedb/edgedb-cli \
+    -I my_instance
 ```
 
-Next, you'll need to get its container ID and connect to the test runner's shell
-```bash
-$ docker ps -a
-CONTAINER ID  IMAGE               COMMAND   ...           PORTS                       NAMES
-<container_id>  edgedb:1-alpha2     "docker-entrypoint.s…"  0.0.0.0:5656->5656/tcp,...  competent_panini
-```
-Then execute:
-```bash
-docker exec -it <container_id> bash
-```
-To disconnect at some point during your interactive terminal session, you can use the escape sequence
-<kbd>Ctrl</kbd>+<kbd>P</kbd> followed by <kbd>Ctrl</kbd>+<kbd>Q</kbd>. More details [here](https://docs.docker.com/engine/reference/commandline/attach/).
-<br />
-Additional info from [this source](https://groups.google.com/forum/#!msg/docker-user/nWXAnyLP9-M/kbv-FZpF4rUJ)
- * docker run -t -i → can be detached with `^P^Q`and reattached with docker attach
- * docker run -i → cannot be detached with `^P^Q`; will disrupt stdin
- * docker run → cannot be detached with `^P^Q`; can SIGKILL client; can reattach with docker attach
-<br />
+## Data Persistence
 
-The remaining manual steps can be completed as follows:
+If you want the contents of the database to survive container restarts,
+you must mount a persistent volume at the path specified by
+`EDGEDB_DATADIR` (`/var/lib/edgedb/data`) by default.  For example:
 
-```bash
-root@e3fd91361668:/# su edbpool 
-edbpool@e3fd91361668:/$ cd ~/edbpool
-edbpool@e3fd91361668:/home/edbpool/edbpool/$ /bin/bash docker-mock-scripts/phase_1/pyenv_installer.sh
-edbpool@e3fd91361668:/home/edbpool/edbpool/$ exec bash
-edbpool@e3fd91361668:/home/edbpool/edbpool/$ pyenv install 3.8-dev
-edbpool@e3fd91361668:/home/edbpool/edbpool/$ pyenv shell 3.8-dev
-edbpool@e3fd91361668:/home/edbpool/edbpool/$ python3 -m venv .
-edbpool@e3fd91361668:/home/edbpool/edbpool/$ source bin/activate
-(edbpool)$ pip install -U pip wheel
-(edbpool)$ pip install -r dev-requirements.txt
+```shell
+$ docker run \
+    --name edgedb -e EDGEDB_PASSWORD=secret \
+    -e EDGEDB_GENERATE_SELF_SIGNED_CERT=1 \
+    -v /my/data/directory:/var/lib/edgedb/data \
+    -d edgedb/edgedb
 ```
 
-To confirm that your virtual local proxies are working properly, it is useful to run:
+Note that on Windows you must use a Docker volume instead:
 
-```bash
-(edbpool)$ python3 -m http.server 18888
+```shell
+$ docker volume create --name=edgedb-data
+$ docker run \
+    --name edgedb -e EDGEDB_PASSWORD=secret \
+    -e EDGEDB_GENERATE_SELF_SIGNED_CERT=1 \
+    -v edgedb-data:/var/lib/edgedb/data \
+    -d edgedb/edgedb
 ```
 
-Then from a terminal (or internet browser) outside of the docker container, you can navigate to 
-[the HTTP server](http://0.0.0.0:18888) or execute:
+It is also possible to run an `edgedb` container on a remote PostgreSQL
+cluster specified by `EDGEDB_POSTGRES_DSN`.  See below for details.
 
-```bash
-user@home:/$ wget -O- http://0.0.0.0:18888
-# or
-user@home:/$ curl -6 http://0.0.0.0:18888
-```
+## Schema Migrations
 
-> Future steps:
+A derived image may include application schema and migrations in
+`/dbschema`, in which case the container will attempt to apply the
+schema migrations found in `/dbschema/migrations`, unless
+the `EDGEDB_SKIP_MIGRATIONS` environment variable is set.
 
-```bash
-edbpool@e3fd91361668:/home/edbpool/edbpool/$ python3 docker-mock-scripts/phase_2/rpc-server.py "docker-mock-scripts/config.json"
-edbpool@e3fd91361668:/home/edbpool/edbpool/$ 
-```
+## Customization
 
-### Appendix
->-1: sudo su
-> 0: docker build -t edgedb:1-alpha2 --build-arg version=1-alpha2 .
-> 1: docker run -it -d -p 15656:5656 -p 5656:5656 -p 6565:16565 -p 16565:16565 -p 18888:18888 -p 8888:8888 edgedb:1-alpha2
-> 2: docker ps -a 
+The behavior of the `edgedb` image can be customized via environment
+variables and initialization scripts.
+
+### Initial container setup
+
+When an `edgedb` container starts on the specified data directory or remote
+Postgres cluster for the first time, initial instance setup is performed.
+This is called the _bootstrap phase_.
+
+The following environment variables affect the bootstrap only and have no
+effect on subsequent container runs. The `_FILE` variants of the variables
+allow passing the value via a file mounted inside a container.
+
+#### `EDGEDB_PASSWORD`, `EDGEDB_PASSWORD_FILE`
+
+Determines the password used for the default superuser account.
+
+#### `EDGEDB_PASSWORD_HASH`, `EDGEDB_PASSWORD_HASH_FILE`
+
+A variant of `EDGEDB_PASSWORD`, where the specified value is a hashed password
+verifier instead of plain text.
+
+#### `EDGEDB_USER`, `EDGEDB_USER_FILE`
+
+Optionally specifies the name of the default superuser account. Defaults to
+`edgedb` if not specified.
+
+#### `EDGEDB_GENERATE_SELF_SIGNED_CERT`
+
+Set this option to `1` to tell the server to automatically generate a
+self-signed certificate with key file in the `EDGEDB_DATADIR` (if present,
+see below), and echo the certificate content in the logs. If the certificate
+file exists, the server will use it instead of generating a new one.
+
+Self-signed certificates are usually used in development and testing, you
+should likely provide your own certificate and key file with the variables below.
+
+#### `EDGEDB_TLS_CERT_FILE`, `EDGEDB_TLS_KEY_FILE`
+
+Specify your own TLS certificate and key files to run the server. Note, the
+value of these two variables are path inside the Docker container, so you may
+want to mount your certificate files into the container with the `-v` option.
+
+#### `EDGEDB_DATABASE`, `EDGEDB_DATABASE_FILE`
+
+Optionally specifies the name of a default database that is created during
+bootstrap. Defaults to `edgedb` if not specified.
+
+#### `EDGEDB_AUTH_METHOD`
+
+Optionally specifies the authentication method used by the server instance.
+Supported values are `"scram"` (the default) and `"trust"`.  When set to
+`"trust"`, the database will allow complete unauthenticated access for all
+who have access to the database port.  In this case the `EDGEDB_PASSWORD`
+(or equivalent) setting is not required.
+
+Use at your own risk and only for testing.
+
+#### `EDGEDB_BOOTSTRAP_COMMAND`, `EDGEDB_BOOTSTRAP_SCRIPT_FILE`
+
+Specifies one or more EdgeQL statements to run at bootstrap. If specified,
+overrides `EDGEDB_PASSWORD`, `EDGEDB_PASSWORD_HASH`, `EDGEDB_USER` and
+`EDGEDB_DATABASE`. Useful to fine-tune initial user and database creation,
+and other initial setup. If neither the `EDGEDB_BOOTSTRAP_COMMAND` variable
+or the `EDGEDB_BOOTSTRAP_SCRIPT_FILE` are explicitly specified, the container
+will look for the presence of `/edgedb-bootstrap.edgeql` in the container
+(which can be placed in a derived image).
+
+#### Custom scripts in `/edgedb-bootstrap.d/
+
+To perform additional initialization, a derived image may include one ore
+more `*.edgeql`, or `*.sh` scripts, which are executed in addition to and
+_after_ the initialization specified by the environment variables above
+or the `/edgedb-bootstrap.edgeql` script.
+
+### Runtime Options
+
+Unlike options listed in the [Initial container setup](#initial-container-setup)
+section above, the configuration documented below applies to all container
+invocations.  It can be specified either as environment variables or
+command-line arguments.
+
+#### `EDGEDB_PORT`, `--port`
+
+Specifies the network port on which EdgeDB will listen inside the container.
+The default is `5656`.  This usually doesn't need to be changed unless you
+run in `host` networking mode.
+
+#### `EDGEDB_BIND_ADDRESS`, `--bind-address`
+
+Specifies the network interface on which EdgeDB will listen inside the
+container.  The default is `0.0.0.0`, which means all interfaces.  This
+usually doesn't need to be changed unless you run in `host` networking mode.
+
+#### `EDGEDB_DATADIR`, `--data-dir`
+
+Specifies a path within the container in which the database files are located.
+Defaults to `/var/run/edgedb/data`.  The container needs to be able to
+change the ownership of the mounted directory to `edgedb`.  Cannot be specified
+at the same time with `EDGEDB_POSTGRES_DSN`.
+
+#### `EDGEDB_POSTGRES_DSN`, `EDGEDB_POSTGRES_DSN_FILE`, `--postgres-dsn`
+
+Specifies a PostgreSQL connection string in the
+[URI format](https://www.postgresql.org/docs/13/libpq-connect.html#id-1.7.3.8.3.6).
+If set, the PostgreSQL cluster specified by the URI is used instead of the
+builtin PostgreSQL server.  Cannot be specified at the same time with
+`EDGEDB_DATADIR`.
+
+#### `EDGEDB_RUNSTATE_DIR`, `--runstate-dir`
+
+Specifies a path within the container in which EdgeDB will place its Unix
+socket and other transient files.
+
+#### `EDGEDB_EXTRA_ARGS`, `--extra-arg, ...`
+
+Extra arguments to be passed to EdgeDB server.
+
+#### Custom scripts in `/docker-entrypoint.d/`
+
+To perform additional initialization, a derived image may include one ore
+more executable files in `/docker-entrypoint.d/`, which will get executed
+by the container entrypoint _before_ any other processing takes place.
