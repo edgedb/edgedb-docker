@@ -71,7 +71,7 @@ $ docker run \
     -d edgedb/edgedb
 ```
 
-Note that on Windows you must use a Docker volume instead:
+Note: on Windows you must use a Docker volume instead:
 
 ```shell
 $ docker volume create --name=edgedb-data
