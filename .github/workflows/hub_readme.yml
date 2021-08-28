@@ -1,0 +1,20 @@
+name: Sync README to Docker Hub
+
+on:
+  push:
+    branches:
+      - master
+      - ci
+    paths:
+      - README.md
+
+jobs:
+  sync_readme:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: edgedb/action-sync-docker-hub-readme@v1
+        with:
+          docker_hub_username: ${{ secrets.DOCKER_USERNAME }}
+          docker_hub_password: ${{ secrets.DOCKER_PASSWORD }}
+          docker_hub_repository: edgedb/edgedb
