@@ -31,9 +31,9 @@ teardown() {
     instances+=($instance)
     # The user declared here is ignored
     docker run -d --name=$container_id --publish=5656 \
-        --env=EDGEDB_USER=user1 \
-        --env=EDGEDB_PASSWORD=password2 \
-        --env=EDGEDB_GENERATE_SELF_SIGNED_CERT=1 \
+        --env=EDGEDB_SERVER_USER=user1 \
+        --env=EDGEDB_SERVER_PASSWORD=password2 \
+        --env=EDGEDB_SERVER_GENERATE_SELF_SIGNED_CERT=1 \
         edgedb-test:schema
     port=$(docker inspect "$container_id" \
         | jq -r '.[0].NetworkSettings.Ports["5656/tcp"][0].HostPort')
@@ -45,5 +45,5 @@ teardown() {
     sleep 3
     # now check that this worked
     edgedb -I "${instance}" \
-        --tab-separated query "INSERT Item { name := 'hello' }"
+        query --output-format=tab-separated "INSERT Item { name := 'hello' }"
 }
