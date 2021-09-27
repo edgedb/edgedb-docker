@@ -30,9 +30,30 @@ teardown() {
     instance="testinst_$(uuidgen | sed s/-//g)"
     instances+=($instance)
     docker run -d --name=$container_id --publish=5656 \
-        --env=EDGEDB_USER=test1 \
-        --env=EDGEDB_PASSWORD=test2 \
-        --env=EDGEDB_GENERATE_SELF_SIGNED_CERT=1 \
+        --env=EDGEDB_SERVER_USER=test1 \
+        --env=EDGEDB_SERVER_PASSWORD=test2 \
+        --env=EDGEDB_SERVER_GENERATE_SELF_SIGNED_CERT=1 \
+        edgedb/edgedb:latest
+    port=$(docker inspect "$container_id" \
+        | jq -r '.[0].NetworkSettings.Ports["5656/tcp"][0].HostPort')
+    echo test2 | edgedb --wait-until-available=120s -P$port \
+        -u test1 --password-from-stdin \
+        instance link --trust-tls-cert --non-interactive "${instance}"
+    output=$(edgedb -I "${instance}" \
+        query "SELECT 7+7")
+    run echo "$output"
+    [[ ${lines[-1]} = "14" ]]
+}
+
+@test "new user plain password old environment vars" {
+    container_id="edb_dock_$(uuidgen | sed s/-//g)"
+    containers+=($container_id)
+    instance="testinst_$(uuidgen | sed s/-//g)"
+    instances+=($instance)
+    docker run -d --name=$container_id --publish=5656 \
+        --env=EDGEDB_SERVER_USER=test1 \
+        --env=EDGEDB_SERVER_PASSWORD=test2 \
+        --env=EDGEDB_SERVER_GENERATE_SELF_SIGNED_CERT=1 \
         edgedb/edgedb:latest
     port=$(docker inspect "$container_id" \
         | jq -r '.[0].NetworkSettings.Ports["5656/tcp"][0].HostPort')
@@ -51,9 +72,9 @@ teardown() {
     instance="testinst_$(uuidgen | sed s/-//g)"
     instances+=($instance)
     docker run -d --name=$container_id --publish=5656 \
-        --env=EDGEDB_USER=test1 \
-        --env='EDGEDB_PASSWORD_HASH=SCRAM-SHA-256$4096:rEQ2xuv6ASCA61VMaqU9yg==$uvda3+u+zewd/GvbIofDjk5EEReNJ0KRhLX0001bVRQ=:sdF5jXfPMnM9GNu+JC39fV4Pa5oZEULEm8cdDRZMJDw=' \
-        --env=EDGEDB_GENERATE_SELF_SIGNED_CERT=1 \
+        --env=EDGEDB_SERVER_USER=test1 \
+        --env='EDGEDB_SERVER_PASSWORD_HASH=SCRAM-SHA-256$4096:rEQ2xuv6ASCA61VMaqU9yg==$uvda3+u+zewd/GvbIofDjk5EEReNJ0KRhLX0001bVRQ=:sdF5jXfPMnM9GNu+JC39fV4Pa5oZEULEm8cdDRZMJDw=' \
+        --env=EDGEDB_SERVER_GENERATE_SELF_SIGNED_CERT=1 \
         edgedb/edgedb:latest
     port=$(docker inspect "$container_id" \
         | jq -r '.[0].NetworkSettings.Ports["5656/tcp"][0].HostPort')
@@ -72,8 +93,8 @@ teardown() {
     instance="testinst_$(uuidgen | sed s/-//g)"
     instances+=($instance)
     docker run -d --name=$container_id --publish=5656 \
-        --env=EDGEDB_BOOTSTRAP_COMMAND="CREATE SUPERUSER ROLE test1 { SET password := 'test4'; };" \
-        --env=EDGEDB_GENERATE_SELF_SIGNED_CERT=1 \
+        --env=EDGEDB_SERVER_BOOTSTRAP_COMMAND="CREATE SUPERUSER ROLE test1 { SET password := 'test4'; };" \
+        --env=EDGEDB_SERVER_GENERATE_SELF_SIGNED_CERT=1 \
         edgedb/edgedb:latest
     port=$(docker inspect "$container_id" \
         | jq -r '.[0].NetworkSettings.Ports["5656/tcp"][0].HostPort')
@@ -112,8 +133,8 @@ teardown() {
     instance="testinst_$(uuidgen | sed s/-//g)"
     instances+=($instance)
     docker run -d --name=$container_id --publish=5656 \
-        --env=EDGEDB_PASSWORD=test2 \
-        --env=EDGEDB_GENERATE_SELF_SIGNED_CERT=1 \
+        --env=EDGEDB_SERVER_PASSWORD=test2 \
+        --env=EDGEDB_SERVER_GENERATE_SELF_SIGNED_CERT=1 \
         edgedb/edgedb:latest
     port=$(docker inspect "$container_id" \
         | jq -r '.[0].NetworkSettings.Ports["5656/tcp"][0].HostPort')
@@ -132,8 +153,8 @@ teardown() {
     instance="testinst_$(uuidgen | sed s/-//g)"
     instances+=($instance)
     docker run -d --name=$container_id --publish=5656 \
-        --env='EDGEDB_PASSWORD_HASH=SCRAM-SHA-256$4096:rEQ2xuv6ASCA61VMaqU9yg==$uvda3+u+zewd/GvbIofDjk5EEReNJ0KRhLX0001bVRQ=:sdF5jXfPMnM9GNu+JC39fV4Pa5oZEULEm8cdDRZMJDw=' \
-        --env=EDGEDB_GENERATE_SELF_SIGNED_CERT=1 \
+        --env='EDGEDB_SERVER_PASSWORD_HASH=SCRAM-SHA-256$4096:rEQ2xuv6ASCA61VMaqU9yg==$uvda3+u+zewd/GvbIofDjk5EEReNJ0KRhLX0001bVRQ=:sdF5jXfPMnM9GNu+JC39fV4Pa5oZEULEm8cdDRZMJDw=' \
+        --env=EDGEDB_SERVER_GENERATE_SELF_SIGNED_CERT=1 \
         edgedb/edgedb:latest
     port=$(docker inspect "$container_id" \
         | jq -r '.[0].NetworkSettings.Ports["5656/tcp"][0].HostPort')
@@ -152,10 +173,10 @@ teardown() {
     instance="testinst_$(uuidgen | sed s/-//g)"
     instances+=($instance)
     docker run -d --name=$container_id --publish=5656 \
-        --env=EDGEDB_DATABASE=hello \
-        --env=EDGEDB_USER=test1 \
-        --env=EDGEDB_PASSWORD=test5 \
-        --env=EDGEDB_GENERATE_SELF_SIGNED_CERT=1 \
+        --env=EDGEDB_SERVER_DATABASE=hello \
+        --env=EDGEDB_SERVER_USER=test1 \
+        --env=EDGEDB_SERVER_PASSWORD=test5 \
+        --env=EDGEDB_SERVER_GENERATE_SELF_SIGNED_CERT=1 \
         edgedb/edgedb:latest
     port=$(docker inspect "$container_id" \
         | jq -r '.[0].NetworkSettings.Ports["5656/tcp"][0].HostPort')
@@ -175,12 +196,11 @@ teardown() {
     instances+=($instance)
     docker run -d --publish=5656 \
         --name=$container_id \
-        --env=EDGEDB_DOCKER_TRACE=true \
-        --env=EDGEDB_DATABASE=hello \
-        --env=EDGEDB_USER=test1 \
-        --env=EDGEDB_PASSWORD=test_tls \
-        --env=EDGEDB_TLS_KEY="$(cat tests/compose/certs/server_key.pem)" \
-        --env=EDGEDB_TLS_CERT="$(cat tests/compose/certs/server_cert.pem)" \
+        --env=EDGEDB_SERVER_DATABASE=hello \
+        --env=EDGEDB_SERVER_USER=test1 \
+        --env=EDGEDB_SERVER_PASSWORD=test_tls \
+        --env=EDGEDB_SERVER_TLS_KEY="$(cat tests/compose/certs/server_key.pem)" \
+        --env=EDGEDB_SERVER_TLS_CERT="$(cat tests/compose/certs/server_cert.pem)" \
         edgedb/edgedb:latest
     port=$(docker inspect "$container_id" \
         | jq -r '.[0].NetworkSettings.Ports["5656/tcp"][0].HostPort')
