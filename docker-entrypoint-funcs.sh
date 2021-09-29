@@ -1,10 +1,20 @@
 #!/usr/bin/env bash
 
+declare -A _edbdocker_log_levels=([trace]=0 [debug]=1 [info]=2 [warning]=3)
+_edbdocker_log_level="info"
 
 edbdocker_setup_shell() {
   set -Eeo pipefail
   shopt -s dotglob inherit_errexit nullglob compat"${BASH_COMPAT=42}"
-  if [ -n "$EDGEDB_SERVER_DOCKER_TRACE" ]; then
+  if [[ -n ${EDGEDB_SERVER_DOCKER_LOG_LEVEL+x} ]]; then
+    _edbdocker_log_level="${EDGEDB_SERVER_DOCKER_LOG_LEVEL,,}"
+
+    if ! [[ ${_edbdocker_log_levels[$_edbdocker_log_level]} ]]; then
+      edbdocker_die "unknown level passed to EDGEDB_SERVER_DOCKER_LOG_LEVEL: \"$EDGEDB_SERVER_DOCKER_LOG_LEVEL\""
+    fi
+  fi
+
+  if [ "$_edbdocker_log_level" == "trace" ]; then
       set -x
   fi
 }
@@ -257,7 +267,7 @@ edbdocker_setup_env() {
   edbdocker_lookup_env_var "EDGEDB_SERVER_TLS_CERT" "" true
   edbdocker_lookup_env_var "EDGEDB_SERVER_GENERATE_SELF_SIGNED_CERT"
   edbdocker_lookup_env_var "EDGEDB_SERVER_BOOTSTRAP_COMMAND"
-  edbdocker_lookup_env_var "EDGEDB_SERVER_DOCKER_TRACE"
+  edbdocker_lookup_env_var "EDGEDB_SERVER_DOCKER_LOG_LEVEL"
 
   if [ -n "${EDGEDB_SERVER_DATADIR:-}" ] && [ -n "${EDGEDB_SERVER_POSTGRES_DSN:-}" ]; then
     edbdocker_die "ERROR: EDGEDB_SERVER_DATADIR and EDGEDB_SERVER_POSTGRES_DSN are mutually exclusive, but both are set"
@@ -326,7 +336,7 @@ edbdocker_lookup_env_var() {
       "WARNING: ${old_var} is deprecated use ${var} instead.           "
       "=============================================================== "
     )
-    edbdocker_log "${msg[@]}"
+    edbdocker_log_at_level "warning" "${msg[@]}"
   fi
 
   if [ -n "${old_file_var_val}" ] && edbdocker_env_var_deprecated "${old_file_var}"; then
@@ -335,7 +345,7 @@ edbdocker_lookup_env_var() {
       "WARNING: ${old_file_var} is deprecated use ${file_var} instead. "
       "=============================================================== "
     )
-    edbdocker_log "${msg[@]}"
+    edbdocker_log_at_level "warning" "${msg[@]}"
   fi
 
   if [ -n "${var_val}" ] && [ -n "${old_var_val}" ]; then
@@ -495,7 +505,7 @@ edbdocker_bootstrap_instance() {
           "         or EDGEDB_SERVER_PASSWORD_HASH environment variables.  "
           "=============================================================== "
         )
-        edbdocker_log "${msg[@]}"
+        edbdocker_log_at_level "warning" "${msg[@]}"
       else
         msg=(
           "ERROR: the EdgeDB instance at the specified location is not     "
@@ -516,9 +526,9 @@ edbdocker_bootstrap_instance() {
   fi
 
   if [ -n "${EDGEDB_SERVER_POSTGRES_DSN}" ]; then
-    edbdocker_log "Bootstrapping EdgeDB instance on remote Postgres cluster..."
+    edbdocker_log_at_level "info" "Bootstrapping EdgeDB instance on remote Postgres cluster..."
   else
-    edbdocker_log "Bootstrapping EdgeDB instance on the local volume..."
+    edbdocker_log_at_level "info" "Bootstrapping EdgeDB instance on the local volume..."
   fi
 
   edbdocker_run_temp_server \
@@ -549,8 +559,8 @@ _edbdocker_bootstrap_cb() {
         "instance.                                                       "
         "                                                                "
       )
-      edbdocker_log "${msg[@]}"
-      edbdocker_log "$(cat ${EDGEDB_SERVER_DATADIR}/edbtlscert.pem)"
+      edbdocker_log_at_level "info" "${msg[@]}"
+      edbdocker_log_at_level "info" "$(cat ${EDGEDB_SERVER_DATADIR}/edbtlscert.pem)"
       msg=(
         "                                                                "
         "If you have the EdgeDB CLI isntalled on the host system, you can"
@@ -566,7 +576,7 @@ _edbdocker_bootstrap_cb() {
         "                                                                "
         "================================================================"
       )
-      edbdocker_log "${msg[@]}"
+      edbdocker_log_at_level "info" "${msg[@]}"
     fi
   fi
 
@@ -604,7 +614,7 @@ _edbdocker_bootstrap_cb() {
 
     # Feeding scripts one by one, so that errors are easier to debug
     for filename in $(/bin/run-parts --list "$dir" --regex='\.edgeql$'); do
-      edbdocker_log "Bootstrap script $filename"
+      edbdocker_log_at_level "info" "Bootstrap script $filename"
       cat "$filename" | edbdocker_cli "${conn_opts[@]}"
     done
   fi
@@ -633,7 +643,7 @@ _edbdocker_bootstrap_abort_cb() {
 # Usage: `EDGEDB_SERVER_DATADIR=/foo/bar edbdocker_run_migrations`
 edbdocker_run_migrations() {
   if [ -d "/dbschema" ] && [ -z "${EDGEDB_SERVER_SKIP_MIGRATIONS:-}" ]; then
-    edbdocker_log "Applying schema migrations..."
+    edbdocker_log_at_level "info" "Applying schema migrations..."
     edbdocker_run_temp_server \
       _edbdocker_migrations_cb \
       _edbdocker_migrations_abort_cb
@@ -709,6 +719,21 @@ edbdocker_log() {
 edbdocker_die() {
   edbdocker_log "${@}"
   exit 1
+}
+
+edbdocker_log_at_level() {
+  local level=$1
+  shift 1
+
+  if ! [[ ${_edbdocker_log_levels[$level]} ]]; then
+    edbdocker_die "unknown level passed to edbdocker_log_at_level: \"$level\""
+  fi
+
+  if (( ${_edbdocker_log_levels[$level]} < ${_edbdocker_log_levels[$_edbdocker_log_level]} )); then
+    return 0
+  fi
+
+  edbdocker_log "${@}"
 }
 
 
@@ -924,6 +949,6 @@ _edbdocker_watch_cert() {
     "        to establish connections to this EdgeDB instance:       "
     "=============================================================== "
   )
-  edbdocker_log "${msg[@]}"
-  edbdocker_log "$(cat ${cert_path})"
+  edbdocker_log_at_level "info" "${msg[@]}"
+  edbdocker_log_at_level "info" "$(cat ${cert_path})"
 }

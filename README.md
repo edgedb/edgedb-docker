@@ -164,6 +164,11 @@ user and database creation, and other initial setup. If neither the
 will look for the presence of `/edgedb-bootstrap.edgeql` in the container
 (which can be placed in a derived image).
 
+#### `EDGEDB_SERVER_DOCKER_LOG_LEVEL`
+
+Determines the log verbosity level in the entrypoint script. Valid levels are
+`trace`, `debug`, `info`, and `warning`.  The default is `info`.
+
 #### Custom scripts in `/edgedb-bootstrap.d/
 
 To perform additional initialization, a derived image may include one ore
