@@ -110,6 +110,10 @@ edbdocker_parse_args() {
         export EDGEDB_SERVER_BOOTSTRAP_ONLY="1"
         shift
         ;;
+      --insecure-dev-mode)
+        export EDGEDB_SERVER_INSECURE_DEV_MODE="1"
+        shift
+        ;;
       --generate-self-signed-cert)
         export EDGEDB_SERVER_GENERATE_SELF_SIGNED_CERT="1"
         shift
@@ -239,6 +243,14 @@ edbdocker_run_server() {
       server_args+=(--emit-server-status="${EDGEDB_SERVER_EMIT_SERVER_STATUS}")
   fi
 
+  if [ -n "${EDGEDB_SERVER_DEFAULT_AUTH_METHOD}" ] && edbdocker_server_supports "--default-auth-method"; then
+    server_args+=(--default-auth-method="${EDGEDB_SERVER_DEFAULT_AUTH_METHOD}")
+  fi
+
+  if [ -n "${EDGEDB_SERVER_ALLOW_INSECURE_HTTP_CLIENTS}" ]; then
+    server_args+=(--allow-insecure-http-clients)
+  fi
+
   server_args+=( "${_EDGEDB_DOCKER_CMDLINE_ARGS[@]}" )
 
   set -- edgedb-server "${server_args[@]}" ${EDGEDB_SERVER_EXTRA_ARGS}
@@ -253,11 +265,22 @@ edbdocker_run_server() {
 
 # Populate important environment variables and make sure they are sane.
 edbdocker_setup_env() {
-  : ${EDGEDB_SERVER_PORT:="5656"}
-  : ${EDGEDB_SERVER_BIND_ADDRESS:="0.0.0.0"}
-  : ${EDGEDB_SERVER_AUTH_METHOD:="scram"}
+  : ${EDGEDB_SERVER_ALLOW_INSECURE_HTTP_CLIENTS:=}
   : ${EDGEDB_SERVER_SERVER_UID:="edgedb"}
 
+  if [ -n "${EDGEDB_SERVER_AUTH_METHOD}" ]; then
+    msg=(
+      "======================================================="
+      "WARNING: EDGEDB_SERVER_AUTH_METHOD is deprecated.      "
+      "         Use EDGEDB_SERVER_DEFAULT_AUTH_METHOD instead."
+      "======================================================="
+    )
+    edbdocker_log_at_level "warning" "${msg[@]}"
+  fi
+
+  edbdocker_lookup_env_var "EDGEDB_SERVER_PORT" "5656"
+  edbdocker_lookup_env_var "EDGEDB_SERVER_BIND_ADDRESS" "0.0.0.0"
+  edbdocker_lookup_env_var "EDGEDB_SERVER_DEFAULT_AUTH_METHOD" "${EDGEDB_SERVER_AUTH_METHOD-default}"
   edbdocker_lookup_env_var "EDGEDB_SERVER_USER" "edgedb"
   edbdocker_lookup_env_var "EDGEDB_SERVER_DATABASE" "edgedb"
   edbdocker_lookup_env_var "EDGEDB_SERVER_PASSWORD"
@@ -292,6 +315,35 @@ edbdocker_setup_env() {
   fi
 
   export EDGEDB_SERVER_RUNSTATE_DIR="${EDGEDB_SERVER_RUNSTATE_DIR:-/run/edgedb}"
+
+  if [ -n "${EDGEDB_SERVER_INSECURE_DEV_MODE}" ]; then
+    if [ \
+      -z "${EDGEDB_SERVER_TLS_CERT_FILE}" \
+      -a -z "${EDGEDB_SERVER_TLS_KEY_FILE}" \
+    ]; then
+      export EDGEDB_SERVER_GENERATE_SELF_SIGNED_CERT=1
+    fi
+
+    if [ \
+      -z "${EDGEDB_SERVER_PASSWORD}" \
+      -a -z "${EDGEDB_SERVER_PASSWORD_HASH}" \
+      -a "${EDGEDB_SERVER_DEFAULT_AUTH_METHOD}" = "default" \
+    ]; then
+      export EDGEDB_SERVER_DEFAULT_AUTH_METHOD="Trust"
+    fi
+
+    export EDGEDB_SERVER_ALLOW_INSECURE_HTTP_CLIENTS=1
+  fi
+
+  if [ "${EDGEDB_SERVER_DEFAULT_AUTH_METHOD}" = "default" ]; then
+    export EDGEDB_SERVER_DEFAULT_AUTH_METHOD="SCRAM"
+  elif [ "${EDGEDB_SERVER_DEFAULT_AUTH_METHOD,,}" = "scram" ]; then
+    export EDGEDB_SERVER_DEFAULT_AUTH_METHOD="SCRAM"
+  elif [ "${EDGEDB_SERVER_DEFAULT_AUTH_METHOD,,}" = "trust" ]; then
+    export EDGEDB_SERVER_DEFAULT_AUTH_METHOD="Trust"
+  else
+    edbdocker_die "ERROR: unsupported auth method: \"${EDGEDB_SERVER_DEFAULT_AUTH_METHOD}\""
+  fi
 }
 
 
@@ -487,42 +539,57 @@ edbdocker_bootstrap_instance() {
         else
           bootstrap_cmd="CREATE SUPERUSER ROLE ${EDGEDB_SERVER_USER} { SET password := '${EDGEDB_SERVER_PASSWORD}'; }"
         fi
-      elif [ "${EDGEDB_SERVER_AUTH_METHOD:-}" = "trust" ]; then
-        bootstrap_cmd="CONFIGURE SYSTEM INSERT Auth {priority := 0, method := (INSERT Trust)};"
+      elif [ "${EDGEDB_SERVER_DEFAULT_AUTH_METHOD:-}" = "Trust" ]; then
+        if ! edbdocker_server_supports "--default-auth-method"; then
+          bootstrap_cmd="CONFIGURE SYSTEM INSERT Auth {priority := 0, method := (INSERT Trust)};"
+        fi
         msg=(
-          "=============================================================== "
-          "WARNING: EDGEDB_SERVER_AUTH_METHOD is set to 'trust'.  This will"
-          "         allow unauthenticated access to this EdgeDB instance   "
-          "         for all who have access to the database port! This     "
-          "         might include other containers or processes on the same"
-          "         host and, if port ${EDGEDB_SERVER_PORT} is bound to an "
-          "         accessible interface on the host, other machines on the"
-          "         network.                                               "
+          "================================================================"
+          "                          WARNING                               "
+          "                          -------                               "
           "                                                                "
-          "         Use only for TESTING in a known environment without    "
-          "         sensitive data.  It is strongly recommended to use     "
-          "         password authentication via the EDGEDB_SERVER_PASSWORD "
-          "         or EDGEDB_SERVER_PASSWORD_HASH environment variables.  "
-          "=============================================================== "
+          "EDGEDB_SERVER_DEFAULT_AUTH_METHOD is set to 'Trust'.  This will "
+          "allow unauthenticated access to this EdgeDB instance for all who"
+          "have access to the database port! This might include other      "
+          "containers or processes on the same host and, if port ${EDGEDB_SERVER_PORT}"
+          "is bound to an accessible interface on the host, other machines "
+          "on the network.                                                 "
+          "                                                                "
+          "Use only for DEVELOPMENT and TESTING in a known environment     "
+          "without sensitive data.  Otherwise, it is strongly recommended  "
+          "to use password authentication via the EDGEDB_SERVER_PASSWORD   "
+          "or EDGEDB_SERVER_PASSWORD_HASH environment variables.           "
+          "================================================================"
         )
         edbdocker_log_at_level "warning" "${msg[@]}"
       else
         msg=(
-          "ERROR: the EdgeDB instance at the specified location is not     "
-          "       initialized and superuser password is not specified.     "
-          "       Please set EDGEDB_SERVER_PASSWORD or                     "
-          "       EDGEDB_SERVER_PASSWORD_HASH environment variable to a    "
-          "       non-empty value.                                         "
+          "================================================================"
+          "                           ERROR                                "
+          "                           -----                                "
           "                                                                "
-          "       For example:                                             "
+          "The EdgeDB instance at the specified location is not initialized"
+          "and superuser password has not been specified. Please set either"
+          "the EDGEDB_SERVER_PASSWORD or the EDGEDB_SERVER_PASSWORD_FILE   "
+          "environment variable to a non-empty value.                      "
           "                                                                "
-          "       $ docker run -e EDGEDB_SERVER_PASSWORD=password edgedb/edgedb   "
+          "For example:                                                    "
+          "                                                                "
+          "$ docker run -e EDGEDB_SERVER_PASSWORD_FILE=/pass edgedb/edgedb "
+          "                                                                "
+          "Alternatively, if doing local development and database security "
+          "is not a concern, set the EDGEDB_SERVER_INSECURE_DEV_MODE       "
+          "environment variable to a non-empty value, which would disable  "
+          "password authentication and let this EdgeDB server use a self-  "
+          "signed TLS certificate.                                         "
         )
         edbdocker_die "${msg[@]}"
       fi
     fi
 
-    bootstrap_opts+=( --bootstrap-command="$bootstrap_cmd" )
+    if [ -n "$bootstrap_cmd" ]; then
+      bootstrap_opts+=( --bootstrap-command="$bootstrap_cmd" )
+    fi
   fi
 
   if [ -n "${EDGEDB_SERVER_POSTGRES_DSN}" ]; then
@@ -539,11 +606,21 @@ edbdocker_bootstrap_instance() {
 
 
 _edbdocker_bootstrap_cb() {
-  local conn_opts
+  local -a conn_opts
   local dir
 
   if [ -z "${EDGEDB_SERVER_HIDE_GENERATED_CERT}" ]; then
-    if [ -n "${EDGEDB_SERVER_DATADIR}" ] && [ -n "${EDGEDB_SERVER_GENERATE_SELF_SIGNED_CERT}" ]; then
+    if [ -n "${EDGEDB_SERVER_DATADIR}" ] \
+       && [ -n "${EDGEDB_SERVER_GENERATE_SELF_SIGNED_CERT}" ]
+    then
+      local -a link_opts
+
+      link_opts+=( "-P" "<published-port>" )
+
+      if [ "${EDGEDB_SERVER_USER}" != "edgedb" ]; then
+        link_opts+=( "-u" "${EDGEDB_SERVER_USER}" )
+      fi
+
       msg=(
         "================================================================"
         "                             NOTICE                             "
@@ -553,26 +630,25 @@ _edbdocker_bootstrap_cb() {
         "server data directory ('${EDGEDB_SERVER_DATADIR}' in this       "
         "container).                                                     "
         "                                                                "
-        "For your convenience, the generated certificate is printed below"
-        "Please remember to include the BEGIN and END CERTIFICATE lines, "
-        "and use this certificate to establish connections to this EdgeDB"
-        "instance.                                                       "
+        "If you have the EdgeDB CLI installed on the host system, you can"
+        "also persist the authentication credentials and the certificate "
+        "by running:                                                     "
+        "                                                                "
+        "  edgedb ${link_opts[*]} instance link --trust-tls-cert my_instance"
+        "                                                                "
+        "You can then connect to the instance by running:                "
+        "                                                                "
+        "  edgedb -I my_instance                                       "
+        "                                                                "
+        "If you with to use the generated certificate manually, it is    "
+        "printed below.  Please remember to include the BEGIN and END    "
+        "CERTIFICATE lines.                                              "
         "                                                                "
       )
       edbdocker_log_at_level "info" "${msg[@]}"
       edbdocker_log_at_level "info" "$(cat ${EDGEDB_SERVER_DATADIR}/edbtlscert.pem)"
       msg=(
         "                                                                "
-        "If you have the EdgeDB CLI isntalled on the host system, you can"
-        "also persist the authentication credentials and the certificate "
-        "by running:                                                     "
-        "                                                                "
-        "    edgedb -u ${EDGEDB_SERVER_USER} --port=<published-port> \   "
-        "        --password instance link --trust-tls-cert my_instance   "
-        "                                                                "
-        "and then connect to it via:                                     "
-        "                                                                "
-        "    edgedb -I my_instance                                       "
         "                                                                "
         "================================================================"
       )
@@ -581,7 +657,7 @@ _edbdocker_bootstrap_cb() {
   fi
 
   dir="/edgedb-bootstrap.d"
-  conn_opts=( "$@" )
+  conn_opts+=( "$@" )
 
   if [ "$EDGEDB_SERVER_DATABASE" != "edgedb" ]; then
     echo "CREATE DATABASE \`${EDGEDB_SERVER_DATABASE}\`;" \
