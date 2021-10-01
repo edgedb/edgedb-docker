@@ -21,7 +21,9 @@ edbdocker_setup_shell() {
 
 
 edbdocker_is_server_command() {
-  [ $# -eq 0 -o "${1:0:1}" = "-" -o "$1" = "edgedb-server" ] \
+  [ $# -eq 0 ] \
+  || [ "${1:0:1}" = "-" ] \
+  || [ "$1" = "edgedb-server" ] \
   && [ -z "$_EDBDOCKER_SHOW_HELP" ]
 }
 
@@ -189,6 +191,7 @@ edbdocker_run_entrypoint_parts() {
 
 edbdocker_bootstrap_needed() {
   if [ -n "${EDGEDB_SERVER_POSTGRES_DSN}" ]; then
+    # shellcheck disable=SC2251
     ! edbdocker_remote_cluster_is_initialized "${EDGEDB_SERVER_POSTGRES_DSN}"
   else
     [ -z "$(ls -A "${EDGEDB_SERVER_DATADIR}")" ]
@@ -253,6 +256,7 @@ edbdocker_run_server() {
 
   server_args+=( "${_EDGEDB_DOCKER_CMDLINE_ARGS[@]}" )
 
+  # shellcheck disable=SC2086
   set -- edgedb-server "${server_args[@]}" ${EDGEDB_SERVER_EXTRA_ARGS}
 
   if [ "$(id -u)" = "0" ]; then
@@ -265,8 +269,8 @@ edbdocker_run_server() {
 
 # Populate important environment variables and make sure they are sane.
 edbdocker_setup_env() {
-  : ${EDGEDB_SERVER_ALLOW_INSECURE_HTTP_CLIENTS:=}
-  : ${EDGEDB_SERVER_SERVER_UID:="edgedb"}
+  : "${EDGEDB_SERVER_ALLOW_INSECURE_HTTP_CLIENTS:=}"
+  : "${EDGEDB_SERVER_SERVER_UID:=edgedb}"
 
   if [ -n "${EDGEDB_SERVER_AUTH_METHOD}" ]; then
     msg=(
@@ -317,18 +321,16 @@ edbdocker_setup_env() {
   export EDGEDB_SERVER_RUNSTATE_DIR="${EDGEDB_SERVER_RUNSTATE_DIR:-/run/edgedb}"
 
   if [ -n "${EDGEDB_SERVER_INSECURE_DEV_MODE}" ]; then
-    if [ \
-      -z "${EDGEDB_SERVER_TLS_CERT_FILE}" \
-      -a -z "${EDGEDB_SERVER_TLS_KEY_FILE}" \
-    ]; then
+    if [ -z "${EDGEDB_SERVER_TLS_CERT_FILE}" ] \
+       && [ -z "${EDGEDB_SERVER_TLS_KEY_FILE}" ]
+    then
       export EDGEDB_SERVER_GENERATE_SELF_SIGNED_CERT=1
     fi
 
-    if [ \
-      -z "${EDGEDB_SERVER_PASSWORD}" \
-      -a -z "${EDGEDB_SERVER_PASSWORD_HASH}" \
-      -a "${EDGEDB_SERVER_DEFAULT_AUTH_METHOD}" = "default" \
-    ]; then
+    if [ -z "${EDGEDB_SERVER_PASSWORD}" ] \
+       && [ -z "${EDGEDB_SERVER_PASSWORD_HASH}" ] \
+       && [ "${EDGEDB_SERVER_DEFAULT_AUTH_METHOD}" = "default" ]
+    then
       export EDGEDB_SERVER_DEFAULT_AUTH_METHOD="Trust"
     fi
 
@@ -405,7 +407,7 @@ edbdocker_lookup_env_var() {
       "ERROR: ${var} and ${old_var} are exclusive, but both are set."
   fi
 
-  if [ -z "${var_val}" -a -n "${old_var_val}" ]; then
+  if [ -z "${var_val}" ] && [ -n "${old_var_val}" ]; then
     var_val="${old_var_val}"
     unset "$old_var"
   fi
@@ -415,7 +417,7 @@ edbdocker_lookup_env_var() {
       "ERROR: ${file_var} and ${old_file_var} are exclusive, but both are set."
   fi
 
-  if [ -z "${file_var_val}" -a -n "${old_file_var_val}" ]; then
+  if [ -z "${file_var_val}" ] && [ -n "${old_file_var_val}" ]; then
     file_var_val="${old_file_var_val}"
     unset "$old_file_var"
   fi
@@ -479,8 +481,11 @@ edbdocker_ensure_dirs() {
 # Check if the specified Postgres DSN contains an initialized EdgeDB instance.
 # Returns 0 if so, 1 otherwise.
 edbdocker_remote_cluster_is_initialized() {
-  local pg_dsn="$1"
-  local psql="$(dirname "$(readlink -f /usr/bin/edgedb-server)")/psql"
+  local pg_dsn
+  local psql
+
+  pg_dsn="$1"
+  psql="$(dirname "$(readlink -f /usr/bin/edgedb-server)")/psql"
 
   if echo "\\l" \
      | "$psql" "${pg_dsn}" 2>/dev/null \
@@ -506,8 +511,6 @@ edbdocker_remote_cluster_is_initialized() {
 edbdocker_bootstrap_instance() {
   local bootstrap_cmd
   local bootstrap_opts
-  local server_info
-  local server_pid
   local conn_opts
 
   bootstrap_opts=( "$@" )
@@ -646,7 +649,7 @@ _edbdocker_bootstrap_cb() {
         "                                                                "
       )
       edbdocker_log_at_level "info" "${msg[@]}"
-      edbdocker_log_at_level "info" "$(cat ${EDGEDB_SERVER_DATADIR}/edbtlscert.pem)"
+      edbdocker_log_at_level "info" "$(cat "${EDGEDB_SERVER_DATADIR}"/edbtlscert.pem)"
       msg=(
         "                                                                "
         "                                                                "
@@ -691,7 +694,7 @@ _edbdocker_bootstrap_cb() {
     # Feeding scripts one by one, so that errors are easier to debug
     for filename in $(/bin/run-parts --list "$dir" --regex='\.edgeql$'); do
       edbdocker_log_at_level "info" "Bootstrap script $filename"
-      cat "$filename" | edbdocker_cli "${conn_opts[@]}"
+      edbdocker_cli "${conn_opts[@]}" <"$filename"
     done
   fi
 
@@ -703,7 +706,7 @@ _edbdocker_bootstrap_cb() {
 
 _edbdocker_bootstrap_abort_cb() {
   if [ -n "${EDGEDB_SERVER_DATADIR}" ] && [ -e "${EDGEDB_SERVER_DATADIR}" ]; then
-    (shopt -u nullglob; rm -rf "${EDGEDB_SERVER_DATADIR}/"* || :)
+    (shopt -u nullglob; rm -rf "${EDGEDB_SERVER_DATADIR:?}/"* || :)
   fi
 
   edbdocker_die "$1"
@@ -775,7 +778,7 @@ edbdocker_env_var_deprecated() {
   local v
   v="${1%_FILE}"
   v="${v#EDGEDB_}"
-  [ "${v}" != "HOST" -a "${v}" != "PORT" -a "${v}" != "PASSWORD" ]
+  [ "${v}" != "HOST" ] && [ "${v}" != "PORT" ] && [ "${v}" != "PASSWORD" ]
 }
 
 
@@ -905,14 +908,12 @@ edbdocker_run_temp_server() {
   (
     local port
     local sock
-    local i
-    local check
 
     shopt -s nullglob  # to properly match the Unix socket
 
-    for i in $(seq 1 $(($timeout / $retry_period))); do
+    for _ in $(seq 1 $((timeout / retry_period))); do
       sleep $retry_period
-      if [ "${runstate_dir}/.s.EDGEDB.admin."* ]; then
+      if compgen -G "${runstate_dir}/.s.EDGEDB.admin.*" >/dev/null; then
         break
       fi
     done
@@ -979,22 +980,22 @@ edbdocker_run_temp_server() {
   fi
 
   shell_pid=$$
-  trap "_abort" 10
+  trap "_abort" USR1
 
   kill $edgedb_pid
   (
     sleep 10;
     edbdocker_log "ERROR: Could not complete bootstrap: server did not stop within 10 seconds."
-    kill -10 $shell_pid
+    kill -USR1 $shell_pid
   ) &
   timeout_pid=$!
   wait $edgedb_pid
   kill $timeout_pid
-  trap - 10
+  trap - USR1
 
   rm -r "${runstate_dir}" || :
 
-  return $resuit
+  return $result
 }
 
 
@@ -1012,7 +1013,7 @@ edbdocker_mktemp_for_server() {
 
 _edbdocker_watch_cert() {
   ( tail -f /tmp/edb_server_status & ) | grep -q READY
-  cert_path=$(cat /tmp/edb_server_status | grep READY | sed -n 's/.*"tls_cert_file" *: *"\([^"]*\)".*/\1/p')
+  cert_path=$(grep READY /tmp/edb_server_status | sed -n 's/.*"tls_cert_file" *: *"\([^"]*\)".*/\1/p')
   rm /tmp/edb_server_status
   msg=(
     "=============================================================== "
@@ -1026,5 +1027,5 @@ _edbdocker_watch_cert() {
     "=============================================================== "
   )
   edbdocker_log_at_level "info" "${msg[@]}"
-  edbdocker_log_at_level "info" "$(cat ${cert_path})"
+  edbdocker_log_at_level "info" "$(cat "${cert_path}")"
 }

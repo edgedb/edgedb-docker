@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+# shellcheck disable=SC1091
 source "/usr/local/bin/docker-entrypoint-funcs.sh"
 
 edbdocker_setup_shell
