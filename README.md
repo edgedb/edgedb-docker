@@ -143,15 +143,24 @@ The TLS certificate and private key, exclusive with
 Optionally specifies the name of a default database that is created during
 bootstrap. Defaults to `edgedb` if not specified.
 
-#### `EDGEDB_SERVER_AUTH_METHOD`
+#### `EDGEDB_SERVER_DEFAULT_AUTH_METHOD`
 
 Optionally specifies the authentication method used by the server instance.
-Supported values are `"scram"` (the default) and `"trust"`.  When set to
-`"trust"`, the database will allow complete unauthenticated access for all
+Supported values are `"SCRAM"` (the default) and `"Trust"`.  When set to
+`"Trust"`, the database will allow complete unauthenticated access for all
 who have access to the database port.  In this case the `EDGEDB_SERVER_PASSWORD`
 (or equivalent) setting is not required.
 
-Use at your own risk and only for testing.
+Use at your own risk and only for development and testing.
+
+#### `EDGEDB_SERVER_INSECURE_DEV_MODE`
+
+If specified as a non-empty value, sets `EDGEDB_SERVER_DEFAULT_AUTH_METHOD`
+to `Trust` (see above), and enables `EDGEDB_SERVER_GENERATE_SELF_SIGNED_CERT`
+(unless an explicit TLS certificate is specified).  Finally, if this option is
+set, the server will accept plaintext HTTP connections.
+
+Use at your own risk and only for development and testing.
 
 #### `EDGEDB_SERVER_BOOTSTRAP_COMMAND`, `EDGEDB_SERVER_BOOTSTRAP_SCRIPT_FILE`
 
