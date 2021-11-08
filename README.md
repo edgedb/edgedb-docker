@@ -83,7 +83,7 @@ $ docker run \
 ```
 
 It is also possible to run an `edgedb` container on a remote PostgreSQL
-cluster specified by `EDGEDB_SERVER_POSTGRES_DSN`.  See below for details.
+cluster specified by `EDGEDB_SERVER_BACKEND_DSN`.  See below for details.
 
 ## Schema Migrations
 
@@ -209,9 +209,9 @@ usually doesn't need to be changed unless you run in `host` networking mode.
 Specifies a path within the container in which the database files are located.
 Defaults to `/var/lib/edgedb/data`.  The container needs to be able to
 change the ownership of the mounted directory to `edgedb`.  Cannot be specified
-at the same time with `EDGEDB_SERVER_POSTGRES_DSN`.
+at the same time with `EDGEDB_SERVER_BACKEND_DSN`.
 
-#### `EDGEDB_SERVER_POSTGRES_DSN`, `EDGEDB_SERVER_POSTGRES_DSN_FILE`, `--postgres-dsn`
+#### `EDGEDB_SERVER_BACKEND_DSN`, `EDGEDB_SERVER_BACKEND_DSN_FILE`, `--backend-dsn`
 
 Specifies a PostgreSQL connection string in the
 [URI format](https://www.postgresql.org/docs/13/libpq-connect.html#id-1.7.3.8.3.6).

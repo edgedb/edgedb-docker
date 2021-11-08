@@ -68,12 +68,12 @@ edbdocker_parse_args() {
         export EDGEDB_SERVER_RUNSTATE_DIR="${1#*=}"
         shift
         ;;
-      --postgres-dsn)
-        _edbdocker_parse_arg "EDGEDB_SERVER_POSTGRES_DSN" "$1" "$2"
+      --backend-dsn)
+        _edbdocker_parse_arg "EDGEDB_SERVER_BACKEND_DSN" "$1" "$2"
         shift 2
         ;;
-      --postgres-dsn=*)
-        export EDGEDB_SERVER_POSTGRES_DSN="${1#*=}"
+      --backend-dsn=*)
+        export EDGEDB_SERVER_BACKEND_DSN="${1#*=}"
         shift
         ;;
       -P|--port)
@@ -190,9 +190,9 @@ edbdocker_run_entrypoint_parts() {
 
 
 edbdocker_bootstrap_needed() {
-  if [ -n "${EDGEDB_SERVER_POSTGRES_DSN}" ]; then
+  if [ -n "${EDGEDB_SERVER_BACKEND_DSN}" ]; then
     # shellcheck disable=SC2251
-    ! edbdocker_remote_cluster_is_initialized "${EDGEDB_SERVER_POSTGRES_DSN}"
+    ! edbdocker_remote_cluster_is_initialized "${EDGEDB_SERVER_BACKEND_DSN}"
   else
     [ -z "$(ls -A "${EDGEDB_SERVER_DATADIR}")" ]
   fi
@@ -211,8 +211,8 @@ edbdocker_run_server() {
     --port="$EDGEDB_SERVER_PORT"
   )
 
-  if [ -n "${EDGEDB_SERVER_POSTGRES_DSN}" ]; then
-    server_args+=( --postgres-dsn="${EDGEDB_SERVER_POSTGRES_DSN}" )
+  if [ -n "${EDGEDB_SERVER_BACKEND_DSN}" ]; then
+    server_args+=( --backend-dsn="${EDGEDB_SERVER_BACKEND_DSN}" )
   else
     server_args+=( --data-dir="${EDGEDB_SERVER_DATADIR}" )
   fi
@@ -282,6 +282,21 @@ edbdocker_setup_env() {
     edbdocker_log_at_level "warning" "${msg[@]}"
   fi
 
+  if [ -n "${EDGEDB_SERVER_POSTGRES_DSN}" ]; then
+    if [ -n "${EDGEDB_SERVER_BACKEND_DSN}" ]; then
+      edbdocker_die "ERROR: EDGEDB_SERVER_POSTGRES_DSN and EDGEDB_SERVER_BACKEND_DSN are mutually exclusive, but both are set"
+    else
+      msg=(
+        "======================================================="
+        "WARNING: EDGEDB_SERVER_POSTGRES_DSN is deprecated.      "
+        "         Use EDGEDB_SERVER_BACKEND_DSN instead."
+        "======================================================="
+      )
+      edbdocker_log_at_level "warning" "${msg[@]}"
+      export EDGEDB_SERVER_BACKEND_DSN="${EDGEDB_SERVER_POSTGRES_DSN}"
+    fi
+  fi
+
   edbdocker_lookup_env_var "EDGEDB_SERVER_PORT" "5656"
   edbdocker_lookup_env_var "EDGEDB_SERVER_BIND_ADDRESS" "0.0.0.0"
   edbdocker_lookup_env_var "EDGEDB_SERVER_DEFAULT_AUTH_METHOD" "${EDGEDB_SERVER_AUTH_METHOD-default}"
@@ -289,16 +304,16 @@ edbdocker_setup_env() {
   edbdocker_lookup_env_var "EDGEDB_SERVER_DATABASE" "edgedb"
   edbdocker_lookup_env_var "EDGEDB_SERVER_PASSWORD"
   edbdocker_lookup_env_var "EDGEDB_SERVER_PASSWORD_HASH"
-  edbdocker_lookup_env_var "EDGEDB_SERVER_POSTGRES_DSN"
+  edbdocker_lookup_env_var "EDGEDB_SERVER_BACKEND_DSN"
   edbdocker_lookup_env_var "EDGEDB_SERVER_TLS_KEY" "" true
   edbdocker_lookup_env_var "EDGEDB_SERVER_TLS_CERT" "" true
   edbdocker_lookup_env_var "EDGEDB_SERVER_GENERATE_SELF_SIGNED_CERT"
   edbdocker_lookup_env_var "EDGEDB_SERVER_BOOTSTRAP_COMMAND"
   edbdocker_lookup_env_var "EDGEDB_SERVER_DOCKER_LOG_LEVEL"
 
-  if [ -n "${EDGEDB_SERVER_DATADIR:-}" ] && [ -n "${EDGEDB_SERVER_POSTGRES_DSN:-}" ]; then
-    edbdocker_die "ERROR: EDGEDB_SERVER_DATADIR and EDGEDB_SERVER_POSTGRES_DSN are mutually exclusive, but both are set"
-  elif [ -z "${EDGEDB_SERVER_POSTGRES_DSN}" ]; then
+  if [ -n "${EDGEDB_SERVER_DATADIR:-}" ] && [ -n "${EDGEDB_SERVER_BACKEND_DSN:-}" ]; then
+    edbdocker_die "ERROR: EDGEDB_SERVER_DATADIR and EDGEDB_SERVER_BACKEND_DSN are mutually exclusive, but both are set"
+  elif [ -z "${EDGEDB_SERVER_BACKEND_DSN}" ]; then
     export EDGEDB_SERVER_DATADIR="${EDGEDB_SERVER_DATADIR:-/var/lib/edgedb/data}"
   fi
 
@@ -502,7 +517,7 @@ edbdocker_remote_cluster_is_initialized() {
 
 
 # Bootstrap the configured EdgeDB instance.  Expects either
-# EDGEDB_SERVER_DATADIR or EDGEDB_SERVER_POSTGRES_DSN to be set in the environment.
+# EDGEDB_SERVER_DATADIR or EDGEDB_SERVER_BACKEND_DSN to be set in the environment.
 # Optionally takes extra server arguments.  Bootstrap is performed by
 # a temporary edgedb-server process that gets started on a random port
 # and is shut down once bootstrap is complete.
@@ -595,7 +610,7 @@ edbdocker_bootstrap_instance() {
     fi
   fi
 
-  if [ -n "${EDGEDB_SERVER_POSTGRES_DSN}" ]; then
+  if [ -n "${EDGEDB_SERVER_BACKEND_DSN}" ]; then
     edbdocker_log_at_level "info" "Bootstrapping EdgeDB instance on remote Postgres cluster..."
   else
     edbdocker_log_at_level "info" "Bootstrapping EdgeDB instance on the local volume..."
@@ -715,7 +730,7 @@ _edbdocker_bootstrap_abort_cb() {
 
 # Runs schema migrations found in /dbschema unless
 # EDGEDB_SERVER_SKIP_MIGRATIONS is set.  Expects either EDGEDB_SERVER_DATADIR
-# or EDGEDB_SERVER_POSTGRES_DSN to be set in the environment.  Migrations are
+# or EDGEDB_SERVER_BACKEND_DSN to be set in the environment.  Migrations are
 # applied by a temporary edgedb-server process that gets started on a random
 # port and is shut down once bootstrap is complete.
 #
@@ -853,8 +868,8 @@ edbdocker_run_temp_server() {
   shift 2
   server_opts=( "${@}" )
 
-  if [ -n "${EDGEDB_SERVER_POSTGRES_DSN}" ]; then
-    server_opts+=(--postgres-dsn="${EDGEDB_SERVER_POSTGRES_DSN}")
+  if [ -n "${EDGEDB_SERVER_BACKEND_DSN}" ]; then
+    server_opts+=(--backend-dsn="${EDGEDB_SERVER_BACKEND_DSN}")
   else
     server_opts+=(--data-dir="${EDGEDB_SERVER_DATADIR}")
   fi
