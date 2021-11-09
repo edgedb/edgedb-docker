@@ -207,7 +207,7 @@ usually doesn't need to be changed unless you run in `host` networking mode.
 #### `EDGEDB_SERVER_DATADIR`, `--data-dir`
 
 Specifies a path within the container in which the database files are located.
-Defaults to `/var/run/edgedb/data`.  The container needs to be able to
+Defaults to `/var/lib/edgedb/data`.  The container needs to be able to
 change the ownership of the mounted directory to `edgedb`.  Cannot be specified
 at the same time with `EDGEDB_SERVER_POSTGRES_DSN`.
 
