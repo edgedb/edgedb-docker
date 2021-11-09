@@ -153,9 +153,9 @@ who have access to the database port.  In this case the `EDGEDB_SERVER_PASSWORD`
 
 Use at your own risk and only for development and testing.
 
-#### `EDGEDB_SERVER_INSECURE_DEV_MODE`
+#### `EDGEDB_SERVER_SECURITY`
 
-If specified as a non-empty value, sets `EDGEDB_SERVER_DEFAULT_AUTH_METHOD`
+When set to `insecure_dev_mode`, sets `EDGEDB_SERVER_DEFAULT_AUTH_METHOD`
 to `Trust` (see above), and enables `EDGEDB_SERVER_GENERATE_SELF_SIGNED_CERT`
 (unless an explicit TLS certificate is specified).  Finally, if this option is
 set, the server will accept plaintext HTTP connections.
