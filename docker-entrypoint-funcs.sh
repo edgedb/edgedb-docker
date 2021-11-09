@@ -112,8 +112,20 @@ edbdocker_parse_args() {
         export EDGEDB_SERVER_BOOTSTRAP_ONLY="1"
         shift
         ;;
-      --insecure-dev-mode)
-        export EDGEDB_SERVER_INSECURE_DEV_MODE="1"
+      --security)
+        _edbdocker_parse_arg "EDGEDB_SERVER_SECURITY" "$1" "$2"
+        shift 2
+        ;;
+      --security=*)
+        export EDGEDB_SERVER_SECURITY="${1#*=}"
+        shift
+        ;;
+      --http-endpoint-security)
+        _edbdocker_parse_arg "EDGEDB_SERVER_HTTP_ENDPOINT_SECURITY" "$1" "$2"
+        shift 2
+        ;;
+      --http-endpoint-security=*)
+        export EDGEDB_SERVER_HTTP_ENDPOINT_SECURITY="${1#*=}"
         shift
         ;;
       --generate-self-signed-cert)
@@ -335,7 +347,7 @@ edbdocker_setup_env() {
 
   export EDGEDB_SERVER_RUNSTATE_DIR="${EDGEDB_SERVER_RUNSTATE_DIR:-/run/edgedb}"
 
-  if [ -n "${EDGEDB_SERVER_INSECURE_DEV_MODE}" ]; then
+  if [ "${EDGEDB_SERVER_SECURITY}" = "insecure_dev_mode" ]; then
     if [ -z "${EDGEDB_SERVER_TLS_CERT_FILE}" ] \
        && [ -z "${EDGEDB_SERVER_TLS_KEY_FILE}" ]
     then
@@ -349,7 +361,9 @@ edbdocker_setup_env() {
       export EDGEDB_SERVER_DEFAULT_AUTH_METHOD="Trust"
     fi
 
-    export EDGEDB_SERVER_ALLOW_INSECURE_HTTP_CLIENTS=1
+    if [ -z "${EDGEDB_SERVER_HTTP_ENDPOINT_SECURITY}" ]; then
+      export EDGEDB_SERVER_HTTP_ENDPOINT_SECURITY="optional"
+    fi
   fi
 
   if [ "${EDGEDB_SERVER_DEFAULT_AUTH_METHOD}" = "default" ]; then
@@ -596,8 +610,8 @@ edbdocker_bootstrap_instance() {
           "$ docker run -e EDGEDB_SERVER_PASSWORD_FILE=/pass edgedb/edgedb "
           "                                                                "
           "Alternatively, if doing local development and database security "
-          "is not a concern, set the EDGEDB_SERVER_INSECURE_DEV_MODE       "
-          "environment variable to a non-empty value, which would disable  "
+          "is not a concern, set the EDGEDB_SERVER_SECURITY environment    "
+          "variable to 'insecure_dev_mode' value, which would disable      "
           "password authentication and let this EdgeDB server use a self-  "
           "signed TLS certificate.                                         "
         )
