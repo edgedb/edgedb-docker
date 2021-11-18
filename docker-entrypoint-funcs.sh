@@ -262,8 +262,8 @@ edbdocker_run_server() {
     server_args+=(--default-auth-method="${EDGEDB_SERVER_DEFAULT_AUTH_METHOD}")
   fi
 
-  if [ -n "${EDGEDB_SERVER_ALLOW_INSECURE_HTTP_CLIENTS}" ]; then
-    server_args+=(--allow-insecure-http-clients)
+  if [ -n "${EDGEDB_SERVER_HTTP_ENDPOINT_SECURITY}" ]; then
+    server_args+=(--http-endpoint-security="${EDGEDB_SERVER_HTTP_ENDPOINT_SECURITY}")
   fi
 
   server_args+=( "${_EDGEDB_DOCKER_CMDLINE_ARGS[@]}" )
@@ -346,6 +346,16 @@ edbdocker_setup_env() {
   fi
 
   export EDGEDB_SERVER_RUNSTATE_DIR="${EDGEDB_SERVER_RUNSTATE_DIR:-/run/edgedb}"
+
+  if [ -n "${EDGEDB_SERVER_ALLOW_INSECURE_HTTP_CLIENTS:-}" ]; then
+    if [ -z "${EDGEDB_SERVER_HTTP_ENDPOINT_SECURITY:-}" ]; then
+      export EDGEDB_SERVER_HTTP_ENDPOINT_SECURITY="optional"
+    elif [ "${EDGEDB_SERVER_HTTP_ENDPOINT_SECURITY:-}" = "optional" ]; then
+      :
+    else
+      edbdocker_die "ERROR: EDGEDB_SERVER_ALLOW_INSECURE_HTTP_CLIENTS and EDGEDB_SERVER_HTTP_ENDPOINT_SECURITY are mutually exclusive, but both are set"
+    fi
+  fi
 
   if [ "${EDGEDB_SERVER_SECURITY}" = "insecure_dev_mode" ]; then
     if [ -z "${EDGEDB_SERVER_TLS_CERT_FILE}" ] \
@@ -571,7 +581,7 @@ edbdocker_bootstrap_instance() {
         else
           bootstrap_cmd="CREATE SUPERUSER ROLE ${EDGEDB_SERVER_USER} { SET password := '${EDGEDB_SERVER_PASSWORD}'; }"
         fi
-      elif [ "${EDGEDB_SERVER_DEFAULT_AUTH_METHOD:-}" = "Trust" ]; then
+      elif [ "${EDGEDB_SERVER_DEFAULT_AUTH_METHOD:-}" = "Trust" ] ; then
         if ! edbdocker_server_supports "--default-auth-method"; then
           bootstrap_cmd="CONFIGURE SYSTEM INSERT Auth {priority := 0, method := (INSERT Trust)};"
         fi
