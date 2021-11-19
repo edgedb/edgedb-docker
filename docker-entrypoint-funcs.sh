@@ -236,7 +236,7 @@ edbdocker_run_server() {
   if [ -n "${EDGEDB_SERVER_GENERATE_SELF_SIGNED_CERT}" ]; then
     server_args+=(--generate-self-signed-cert)
     if [ -z "${EDGEDB_SERVER_DATADIR}" ] || [ ! -f "${EDGEDB_SERVER_DATADIR}/edbtlscert.pem" ]; then
-      if [ -z "${EDGEDB_SERVER_EMIT_SERVER_STATUS}" ] && [ -z "${EDGEDB_SERVER_HIDE_GENERATED_CERT}" ]; then
+      if [ -z "${EDGEDB_SERVER_EMIT_SERVER_STATUS}" ]; then
         server_args+=(--emit-server-status="/tmp/edb_server_status")
         touch /tmp/edb_server_status
         chown edgedb:edgedb /tmp/edb_server_status
@@ -1069,20 +1069,32 @@ edbdocker_mktemp_for_server() {
 
 
 _edbdocker_watch_cert() {
+  local cert_path
+  local cert_dir
+
   ( tail -f /tmp/edb_server_status & ) | grep -q READY
   cert_path=$(grep READY /tmp/edb_server_status | sed -n 's/.*"tls_cert_file" *: *"\([^"]*\)".*/\1/p')
+  cert_dir=$(dirname "$cert_path")
   rm /tmp/edb_server_status
-  msg=(
-    "=============================================================== "
-    "NOTICE: TLS certificate is generated at the following path:     "
-    "            ${cert_path}                                        "
-    "                                                                "
-    "        For your convenience, the generated certificate is      "
-    "        echoed below. Please remember to include the BEGIN      "
-    "        and END CERTIFICATE lines, and use this certificate     "
-    "        to establish connections to this EdgeDB instance:       "
-    "=============================================================== "
-  )
-  edbdocker_log_at_level "info" "${msg[@]}"
-  edbdocker_log_at_level "info" "$(cat "${cert_path}")"
+  # Copy certificate and private key to a well-known location.
+  mkdir -p /etc/ssl/edgedb/
+  cp "${cert_dir}"/*.pem "/etc/ssl/edgedb/"
+  chmod 400 /etc/ssl/edgedb/*.pem
+  chown -R "${EDGEDB_SERVER_SERVER_UID}" /etc/ssl/edgedb/
+  cert_path="/etc/ssl/edgedb/$(basename "${cert_path}")"
+  if [ -z "${EDGEDB_SERVER_HIDE_GENERATED_CERT}" ]; then
+    msg=(
+      "=============================================================== "
+      "NOTICE: TLS certificate is generated at the following path:     "
+      "            ${cert_path}                                        "
+      "                                                                "
+      "        For your convenience, the generated certificate is      "
+      "        echoed below. Please remember to include the BEGIN      "
+      "        and END CERTIFICATE lines, and use this certificate     "
+      "        to establish connections to this EdgeDB instance:       "
+      "=============================================================== "
+    )
+    edbdocker_log_at_level "info" "${msg[@]}"
+    edbdocker_log_at_level "info" "$(cat "${cert_path}")"
+  fi
 }
