@@ -389,7 +389,9 @@ edbdocker_setup_env() {
 
 
 # Resolve the value of the specified variable.
+#
 # Usage: edbdocker_lookup_env_var VARNAME [default] [prefer-file]
+#
 # The function looks for $VARNAME in the environment block directly,
 # and also tries to read the value from ${VARNAME}_FILE, if set.
 # For example, `edbdocker_lookup_env_var EDGEDB_SERVER_PASSWORD foo` would
@@ -413,6 +415,7 @@ edbdocker_lookup_env_var() {
 
   var="$1"
   file_var="${var}_FILE"
+  alt_var="${var}_ENV"
   old_var="${var/EDGEDB_SERVER_/EDGEDB_}"
   old_file_var="${old_var}_FILE"
   deflt="${2:-}"
@@ -420,6 +423,7 @@ edbdocker_lookup_env_var() {
   val="$deflt"
   var_val="${!var:-}"
   file_var_val="${!file_var:-}"
+  alt_var_val="${!alt_var:-}"
   old_var_val="${!old_var:-}"
   old_file_var_val="${!old_file_var:-}"
 
@@ -464,6 +468,20 @@ edbdocker_lookup_env_var() {
   if [ -n "${var_val}" ] && [ -n "${file_var_val}" ]; then
     edbdocker_die \
       "ERROR: ${var} and ${file_var} are exclusive, but both are set."
+  fi
+
+  if [ -n "${var_val}" ] && [ -n "${alt_var_val}" ]; then
+    edbdocker_die \
+      "ERROR: ${var} and ${alt_var} are exclusive, but both are set."
+  fi
+
+  if [ -n "${file_var_val}" ] && [ -n "${alt_var_val}" ]; then
+    edbdocker_die \
+      "ERROR: ${file_var} and ${alt_var} are exclusive, but both are set."
+  fi
+
+  if [ "${alt_var_val}" ]; then
+    var_val="${!alt_var_val:-}"
   fi
 
   if [ -n "${var_val}" ]; then
