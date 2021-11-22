@@ -5,7 +5,7 @@ from aiohttp import web
 
 async def read(request):
     name = request.match_info['name']
-    value = await request.app['edgedb'].query_one("""
+    value = await request.app['edgedb'].query_single("""
         SELECT (
             SELECT Counter { visits } FILTER .name = <str>$name
         ).visits ?? 0
@@ -15,7 +15,7 @@ async def read(request):
 
 async def increment(request):
     name = request.match_info['name']
-    value = await request.app['edgedb'].query_one("""
+    value = await request.app['edgedb'].query_single("""
         SELECT (
             INSERT Counter { name := <str>$name, visits := 1 }
             UNLESS CONFLICT ON .name ELSE (
@@ -30,11 +30,7 @@ async def app(options):
     app = web.Application()
     app.add_routes([web.get('/read/{name}', read)])
     app.add_routes([web.get('/increment/{name}', increment)])
-    app['edgedb'] = await edgedb.create_async_pool(
-        host='edgedb',
-        wait_until_available=120,
-        tls_ca_file='ca.pem',
-    )
+    app['edgedb'] = edgedb.create_async_client()
     return app
 
 
