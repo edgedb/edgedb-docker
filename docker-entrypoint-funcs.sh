@@ -85,11 +85,15 @@ edbdocker_parse_args() {
         shift
         ;;
       -I|--bind-address)
-        _edbdocker_parse_arg "EDGEDB_SERVER_BIND_ADDRESS" "$1" "$2"
+        _edbdocker_parse_arg "EDGEDB_SERVER_BIND_ADDRESS" "$1" "$2" "true"
         shift 2
         ;;
       --bind-address=*)
-        export EDGEDB_SERVER_BIND_ADDRESS="${1#*=}"
+        if [ -n "${EDGEDB_SERVER_BIND_ADDRESS:-}" ]; then
+          export EDGEDB_SERVER_BIND_ADDRESS="${EDGEDB_SERVER_BIND_ADDRESS},${1#*=}"
+        else
+          export EDGEDB_SERVER_BIND_ADDRESS="${1#*=}"
+        fi
         shift
         ;;
       --bootstrap-command)
@@ -169,13 +173,23 @@ _edbdocker_parse_arg() {
   local var
   local opt
   local val
+  local multi
+  local curval
 
   var="$1"
   opt="$2"
   val="$3"
+  multi="$4"
+  curval="${!var:-}"
 
   if [ -n "$val" ] && [ "${val:0:1}" != "-" ]; then
-    export "$var"="$val"
+    if [ -n "${curval}" ]; then
+      if [ -n "${multi}" ]; then
+        export "$var=${curval},${val}"
+      fi
+    else
+      export "$var"="$val"
+    fi
   else
     local msg
     msg=(
@@ -213,15 +227,21 @@ edbdocker_bootstrap_needed() {
 
 edbdocker_run_server() {
   local server_args
+  local -a bind_addrs
+  local bind_addr
 
   if [ -n "${EDGEDB_SERVER_BOOTSTRAP_ONLY}" ]; then
     return
   fi
 
-  server_args=(
-    --bind-address="$EDGEDB_SERVER_BIND_ADDRESS"
-    --port="$EDGEDB_SERVER_PORT"
-  )
+  IFS=',' read -ra bind_addrs <<< "$EDGEDB_SERVER_BIND_ADDRESS"
+  for bind_addr in "${bind_addrs[@]}"; do
+    server_args+=(
+      --bind-address="$bind_addr"
+    )
+  done
+
+  server_args+=( --port="$EDGEDB_SERVER_PORT" )
 
   if [ -n "${EDGEDB_SERVER_BACKEND_DSN}" ]; then
     server_args+=( --backend-dsn="${EDGEDB_SERVER_BACKEND_DSN}" )
@@ -310,7 +330,7 @@ edbdocker_setup_env() {
   fi
 
   edbdocker_lookup_env_var "EDGEDB_SERVER_PORT" "5656"
-  edbdocker_lookup_env_var "EDGEDB_SERVER_BIND_ADDRESS" "0.0.0.0"
+  edbdocker_lookup_env_var "EDGEDB_SERVER_BIND_ADDRESS" "0.0.0.0,::"
   edbdocker_lookup_env_var "EDGEDB_SERVER_DEFAULT_AUTH_METHOD" "${EDGEDB_SERVER_AUTH_METHOD-default}"
   edbdocker_lookup_env_var "EDGEDB_SERVER_USER" "edgedb"
   edbdocker_lookup_env_var "EDGEDB_SERVER_DATABASE" "edgedb"
