@@ -3,7 +3,7 @@ instances=()
 
 setup() {
     slot=$(
-        curl https://packages.edgedb.com/apt/.jsonindexes/stretch.nightly.json \
+        curl https://packages.edgedb.com/apt/.jsonindexes/buster.nightly.json \
         | jq -r '[.packages[] | select(.basename == "edgedb-server")] | sort_by(.slot) | reverse | .[0].slot')
     docker build -t edgedb/edgedb:latest \
         --build-arg "version=$slot" --build-arg "subdist=.nightly" \
@@ -32,7 +32,7 @@ teardown() {
     docker run -d --name=$container_id --publish=5656 \
         --env=EDGEDB_SERVER_USER=test1 \
         --env=EDGEDB_SERVER_PASSWORD=test2 \
-        --env=EDGEDB_SERVER_GENERATE_SELF_SIGNED_CERT=1 \
+        --env=EDGEDB_SERVER_TLS_CERT_MODE=generate_self_signed \
         edgedb/edgedb:latest
     port=$(docker inspect "$container_id" \
         | jq -r '.[0].NetworkSettings.Ports["5656/tcp"][0].HostPort')
@@ -53,7 +53,7 @@ teardown() {
     docker run -d --name=$container_id --publish=5656 \
         --env=EDGEDB_SERVER_USER=test1 \
         --env=EDGEDB_SERVER_PASSWORD=test2 \
-        --env=EDGEDB_SERVER_GENERATE_SELF_SIGNED_CERT=1 \
+        --env=EDGEDB_SERVER_TLS_CERT_MODE=generate_self_signed \
         edgedb/edgedb:latest
     port=$(docker inspect "$container_id" \
         | jq -r '.[0].NetworkSettings.Ports["5656/tcp"][0].HostPort')
@@ -74,7 +74,7 @@ teardown() {
     docker run -d --name=$container_id --publish=5656 \
         --env=EDGEDB_SERVER_USER=test1 \
         --env='EDGEDB_SERVER_PASSWORD_HASH=SCRAM-SHA-256$4096:rEQ2xuv6ASCA61VMaqU9yg==$uvda3+u+zewd/GvbIofDjk5EEReNJ0KRhLX0001bVRQ=:sdF5jXfPMnM9GNu+JC39fV4Pa5oZEULEm8cdDRZMJDw=' \
-        --env=EDGEDB_SERVER_GENERATE_SELF_SIGNED_CERT=1 \
+        --env=EDGEDB_SERVER_TLS_CERT_MODE=generate_self_signed \
         edgedb/edgedb:latest
     port=$(docker inspect "$container_id" \
         | jq -r '.[0].NetworkSettings.Ports["5656/tcp"][0].HostPort')
@@ -94,7 +94,7 @@ teardown() {
     instances+=($instance)
     docker run -d --name=$container_id --publish=5656 \
         --env=EDGEDB_SERVER_BOOTSTRAP_COMMAND="CREATE SUPERUSER ROLE test1 { SET password := 'test4'; };" \
-        --env=EDGEDB_SERVER_GENERATE_SELF_SIGNED_CERT=1 \
+        --env=EDGEDB_SERVER_TLS_CERT_MODE=generate_self_signed \
         edgedb/edgedb:latest
     port=$(docker inspect "$container_id" \
         | jq -r '.[0].NetworkSettings.Ports["5656/tcp"][0].HostPort')
@@ -134,7 +134,7 @@ teardown() {
     instances+=($instance)
     docker run -d --name=$container_id --publish=5656 \
         --env=EDGEDB_SERVER_PASSWORD=test2 \
-        --env=EDGEDB_SERVER_GENERATE_SELF_SIGNED_CERT=1 \
+        --env=EDGEDB_SERVER_TLS_CERT_MODE=generate_self_signed \
         edgedb/edgedb:latest
     port=$(docker inspect "$container_id" \
         | jq -r '.[0].NetworkSettings.Ports["5656/tcp"][0].HostPort')
@@ -154,7 +154,7 @@ teardown() {
     instances+=($instance)
     docker run -d --name=$container_id --publish=5656 \
         --env='EDGEDB_SERVER_PASSWORD_HASH=SCRAM-SHA-256$4096:rEQ2xuv6ASCA61VMaqU9yg==$uvda3+u+zewd/GvbIofDjk5EEReNJ0KRhLX0001bVRQ=:sdF5jXfPMnM9GNu+JC39fV4Pa5oZEULEm8cdDRZMJDw=' \
-        --env=EDGEDB_SERVER_GENERATE_SELF_SIGNED_CERT=1 \
+        --env=EDGEDB_SERVER_TLS_CERT_MODE=generate_self_signed \
         edgedb/edgedb:latest
     port=$(docker inspect "$container_id" \
         | jq -r '.[0].NetworkSettings.Ports["5656/tcp"][0].HostPort')
@@ -176,7 +176,7 @@ teardown() {
         --env=EDGEDB_SERVER_DATABASE=hello \
         --env=EDGEDB_SERVER_USER=test1 \
         --env=EDGEDB_SERVER_PASSWORD=test5 \
-        --env=EDGEDB_SERVER_GENERATE_SELF_SIGNED_CERT=1 \
+        --env=EDGEDB_SERVER_TLS_CERT_MODE=generate_self_signed \
         edgedb/edgedb:latest
     port=$(docker inspect "$container_id" \
         | jq -r '.[0].NetworkSettings.Ports["5656/tcp"][0].HostPort')
