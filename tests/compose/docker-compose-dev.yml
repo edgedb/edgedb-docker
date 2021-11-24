@@ -5,17 +5,14 @@ services:
       context: .
       dockerfile: dockerfiles/Dockerfile.edgedb
     environment:
-      - &pwd EDGEDB_PASSWORD=some-password
-      - EDGEDB_SERVER_TLS_CERT_FILE=/certs/server_cert.pem
-      - EDGEDB_SERVER_TLS_KEY_FILE=/certs/server_key.pem
+      - EDGEDB_SERVER_SECURITY=insecure_dev_mode
   python:
     build:
       context: .
-      dockerfile: dockerfiles/Dockerfile.py
+      dockerfile: dockerfiles/Dockerfile.py.nocert
     ports:
       - 34089:80
     links: [edgedb]
     environment:
-      - *pwd
+      - EDGEDB_CLIENT_SECURITY=insecure_dev_mode
       - EDGEDB_HOST=edgedb
-      - EDGEDB_TLS_CA_FILE=/app/ca.pem
