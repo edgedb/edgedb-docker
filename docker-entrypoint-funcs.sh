@@ -1,21 +1,29 @@
 #!/usr/bin/env bash
 
-declare -A _edbdocker_log_levels=([trace]=0 [debug]=1 [info]=2 [warning]=3)
+declare -A _edbdocker_log_levels=(
+  [trace]=0
+  [debug]=1
+  [info]=2
+  [warning]=3
+  [error]=4
+)
+
 _edbdocker_log_level="info"
 
 edbdocker_setup_shell() {
-  set -Eeo pipefail
+  set -Eeu -o pipefail
   shopt -s dotglob inherit_errexit nullglob compat"${BASH_COMPAT=42}"
   if [[ -n ${EDGEDB_SERVER_DOCKER_LOG_LEVEL+x} ]]; then
     _edbdocker_log_level="${EDGEDB_SERVER_DOCKER_LOG_LEVEL,,}"
 
-    if ! [[ ${_edbdocker_log_levels[$_edbdocker_log_level]} ]]; then
+    if [ -z "${_edbdocker_log_levels[$_edbdocker_log_level]:-}" ]; then
       edbdocker_die "unknown level passed to EDGEDB_SERVER_DOCKER_LOG_LEVEL: \"$EDGEDB_SERVER_DOCKER_LOG_LEVEL\""
     fi
   fi
 
   if [ "$_edbdocker_log_level" == "trace" ]; then
-      set -x
+    set -x
+    export PS4='+($(basename ${BASH_SOURCE}):${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
   fi
 }
 
@@ -24,7 +32,7 @@ edbdocker_is_server_command() {
   [ $# -eq 0 ] \
   || [ "${1:0:1}" = "-" ] \
   || [ "$1" = "edgedb-server" ] \
-  && [ -z "$_EDBDOCKER_SHOW_HELP" ]
+  && [ -z "${_EDBDOCKER_SHOW_HELP:-}" ]
 }
 
 
@@ -41,6 +49,13 @@ edbdocker_run_regular_command() {
 # Arguments override environment variables.
 _EDGEDB_DOCKER_CMDLINE_ARGS=()
 
+# Most recent server status reported via --emit-server-info.
+EDGEDB_DOCKER_LAST_SERVER_STATUS=""
+
+# Set by a caller to edbdocker_die() to signal a specific exict code.
+EDGEDB_DOCKER_ABORT_CODE=1
+
+
 edbdocker_parse_args() {
   if [ "${1:0:1}" != '-' ]; then
     shift
@@ -49,7 +64,7 @@ edbdocker_parse_args() {
   while [[ $# -gt 0 ]]; do
     case "$1" in
       -h|--help)
-        export _EDBDOCKER_SHOW_HELP="1"
+        _EDBDOCKER_SHOW_HELP="1"
         shift
         ;;
       -D|--data-dir)
@@ -57,7 +72,7 @@ edbdocker_parse_args() {
         shift 2
         ;;
       --data-dir=*)
-        export EDGEDB_SERVER_DATADIR="${1#*=}"
+        EDGEDB_SERVER_DATADIR="${1#*=}"
         shift
         ;;
       --runstate-dir)
@@ -65,7 +80,7 @@ edbdocker_parse_args() {
         shift 2
         ;;
       --runstate-dir=*)
-        export EDGEDB_SERVER_RUNSTATE_DIR="${1#*=}"
+        EDGEDB_SERVER_RUNSTATE_DIR="${1#*=}"
         shift
         ;;
       --backend-dsn)
@@ -73,7 +88,7 @@ edbdocker_parse_args() {
         shift 2
         ;;
       --backend-dsn=*)
-        export EDGEDB_SERVER_BACKEND_DSN="${1#*=}"
+        EDGEDB_SERVER_BACKEND_DSN="${1#*=}"
         shift
         ;;
       -P|--port)
@@ -81,7 +96,7 @@ edbdocker_parse_args() {
         shift 2
         ;;
       --port=*)
-        export EDGEDB_SERVER_PORT="${1#*=}"
+        EDGEDB_SERVER_PORT="${1#*=}"
         shift
         ;;
       -I|--bind-address)
@@ -90,9 +105,9 @@ edbdocker_parse_args() {
         ;;
       --bind-address=*)
         if [ -n "${EDGEDB_SERVER_BIND_ADDRESS:-}" ]; then
-          export EDGEDB_SERVER_BIND_ADDRESS="${EDGEDB_SERVER_BIND_ADDRESS},${1#*=}"
+          EDGEDB_SERVER_BIND_ADDRESS="${EDGEDB_SERVER_BIND_ADDRESS},${1#*=}"
         else
-          export EDGEDB_SERVER_BIND_ADDRESS="${1#*=}"
+          EDGEDB_SERVER_BIND_ADDRESS="${1#*=}"
         fi
         shift
         ;;
@@ -101,7 +116,7 @@ edbdocker_parse_args() {
         shift 2
         ;;
       --bootstrap-command=*)
-        export EDGEDB_SERVER_BOOTSTRAP_COMMAND="${1#*=}"
+        EDGEDB_SERVER_BOOTSTRAP_COMMAND="${1#*=}"
         shift
         ;;
       --bootstrap-script)
@@ -109,11 +124,11 @@ edbdocker_parse_args() {
         shift 2
         ;;
       --bootstrap-script=*)
-        export EDGEDB_SERVER_BOOTSTRAP_SCRIPT_FILE="${1#*=}"
+        EDGEDB_SERVER_BOOTSTRAP_SCRIPT_FILE="${1#*=}"
         shift
         ;;
       --bootstrap-only)
-        export EDGEDB_SERVER_BOOTSTRAP_ONLY="1"
+        EDGEDB_SERVER_BOOTSTRAP_ONLY="1"
         shift
         ;;
       --security)
@@ -121,7 +136,7 @@ edbdocker_parse_args() {
         shift 2
         ;;
       --security=*)
-        export EDGEDB_SERVER_SECURITY="${1#*=}"
+        EDGEDB_SERVER_SECURITY="${1#*=}"
         shift
         ;;
       --http-endpoint-security)
@@ -129,11 +144,19 @@ edbdocker_parse_args() {
         shift 2
         ;;
       --http-endpoint-security=*)
-        export EDGEDB_SERVER_HTTP_ENDPOINT_SECURITY="${1#*=}"
+        EDGEDB_SERVER_HTTP_ENDPOINT_SECURITY="${1#*=}"
         shift
         ;;
       --generate-self-signed-cert)
-        export EDGEDB_SERVER_GENERATE_SELF_SIGNED_CERT="1"
+        EDGEDB_SERVER_GENERATE_SELF_SIGNED_CERT="1"
+        shift
+        ;;
+      --tls-cert-mode)
+        _edbdocker_parse_arg "EDGEDB_SERVER_TLS_CERT_MODE" "$1" "$2"
+        shift 2
+        ;;
+      --tls-cert-mode=*)
+        EDGEDB_SERVER_TLS_CERT_MODE="${1#*=}"
         shift
         ;;
       --tls-cert-file)
@@ -141,7 +164,7 @@ edbdocker_parse_args() {
         shift 2
         ;;
       --tls-cert-file=*)
-        export EDGEDB_SERVER_TLS_CERT_FILE="${1#*=}"
+        EDGEDB_SERVER_TLS_CERT_FILE="${1#*=}"
         shift
         ;;
       --tls-key-file)
@@ -149,7 +172,7 @@ edbdocker_parse_args() {
         shift 2
         ;;
       --tls-key-file=*)
-        export EDGEDB_SERVER_TLS_KEY_FILE="${1#*=}"
+        EDGEDB_SERVER_TLS_KEY_FILE="${1#*=}"
         shift
         ;;
       --emit-server-status)
@@ -157,7 +180,7 @@ edbdocker_parse_args() {
         shift 2
         ;;
       --emit-server-status=*)
-        export EDGEDB_SERVER_EMIT_SERVER_STATUS="${1#*=}"
+        EDGEDB_SERVER_EMIT_SERVER_STATUS="${1#*=}"
         shift
         ;;
       *)
@@ -185,10 +208,10 @@ _edbdocker_parse_arg() {
   if [ -n "$val" ] && [ "${val:0:1}" != "-" ]; then
     if [ -n "${curval}" ]; then
       if [ -n "${multi}" ]; then
-        export "$var=${curval},${val}"
+        printf -v "$var" "%s" "${curval},${val}"
       fi
     else
-      export "$var"="$val"
+      printf -v "$var" "%s" "$val"
     fi
   else
     local msg
@@ -229,6 +252,7 @@ edbdocker_run_server() {
   local server_args
   local -a bind_addrs
   local bind_addr
+  local status_file
 
   if [ -n "${EDGEDB_SERVER_BOOTSTRAP_ONLY}" ]; then
     return
@@ -253,32 +277,31 @@ edbdocker_run_server() {
     server_args+=( --runstate-dir="${EDGEDB_SERVER_RUNSTATE_DIR}" )
   fi
 
-  if [ -n "${EDGEDB_SERVER_GENERATE_SELF_SIGNED_CERT}" ]; then
-    server_args+=(--generate-self-signed-cert)
-    if [ -z "${EDGEDB_SERVER_DATADIR}" ] || [ ! -f "${EDGEDB_SERVER_DATADIR}/edbtlscert.pem" ]; then
-      if [ -z "${EDGEDB_SERVER_EMIT_SERVER_STATUS}" ] && [ -z "${EDGEDB_SERVER_HIDE_GENERATED_CERT}" ]; then
-        server_args+=(--emit-server-status="/tmp/edb_server_status")
-        touch /tmp/edb_server_status
-        chown edgedb:edgedb /tmp/edb_server_status
-        _edbdocker_watch_cert &
-      fi
+  if [ -n "${EDGEDB_SERVER_TLS_CERT_MODE}" ]; then
+    if edbdocker_server_supports "--tls-cert-mode"; then
+      server_args+=(--tls-cert-mode="${EDGEDB_SERVER_TLS_CERT_MODE}")
+    elif [ "${EDGEDB_SERVER_TLS_CERT_MODE}" = "generate_self_signed" ] \
+         && edbdocker_server_supports "--generate-self-signed-cert"
+    then
+      server_args+=(--generate-self-signed-cert)
     fi
-  elif [ -n "${EDGEDB_SERVER_TLS_CERT_FILE}" ] || [ -n "${EDGEDB_SERVER_TLS_KEY_FILE}" ]; then
-    if [ -n "${EDGEDB_SERVER_TLS_CERT_FILE}" ]; then
-      server_args+=(--tls-cert-file="${EDGEDB_SERVER_TLS_CERT_FILE}")
-    fi
-    if [ -n "${EDGEDB_SERVER_TLS_KEY_FILE}" ]; then
-      server_args+=(--tls-key-file="${EDGEDB_SERVER_TLS_KEY_FILE}")
-    fi
-  elif [ -z "${EDGEDB_SERVER_DATADIR}" ] || [ ! -f "${EDGEDB_SERVER_DATADIR}/edbtlscert.pem" ]; then
-    edbdocker_die_no_tls_cert
+  fi
+
+  if [ -n "${EDGEDB_SERVER_TLS_CERT_FILE}" ]; then
+    server_args+=(--tls-cert-file="${EDGEDB_SERVER_TLS_CERT_FILE}")
+  fi
+
+  if [ -n "${EDGEDB_SERVER_TLS_KEY_FILE}" ]; then
+    server_args+=(--tls-key-file="${EDGEDB_SERVER_TLS_KEY_FILE}")
   fi
 
   if [ -n "${EDGEDB_SERVER_EMIT_SERVER_STATUS}" ]; then
       server_args+=(--emit-server-status="${EDGEDB_SERVER_EMIT_SERVER_STATUS}")
   fi
 
-  if [ -n "${EDGEDB_SERVER_DEFAULT_AUTH_METHOD}" ] && edbdocker_server_supports "--default-auth-method"; then
+  if [ -n "${EDGEDB_SERVER_DEFAULT_AUTH_METHOD}" ] \
+     && edbdocker_server_supports "--default-auth-method"
+  then
     server_args+=(--default-auth-method="${EDGEDB_SERVER_DEFAULT_AUTH_METHOD}")
   fi
 
@@ -288,8 +311,13 @@ edbdocker_run_server() {
 
   server_args+=( "${_EDGEDB_DOCKER_CMDLINE_ARGS[@]}" )
 
+  status_file="$(edbdocker_mktemp_for_server)"
+  server_args+=( --emit-server-status="$status_file" )
+  _edbdocker_print_last_generated_cert_if_needed \
+    "$(_edbdocker_wait_for_status "$status_file")" &
+
   # shellcheck disable=SC2086
-  set -- edgedb-server "${server_args[@]}" ${EDGEDB_SERVER_EXTRA_ARGS}
+  set -- edgedb-server "${server_args[@]}" ${EDGEDB_SERVER_EXTRA_ARGS:-}
 
   if [ "$(id -u)" = "0" ]; then
     exec gosu "${EDGEDB_SERVER_SERVER_UID}" "$@"
@@ -301,10 +329,25 @@ edbdocker_run_server() {
 
 # Populate important environment variables and make sure they are sane.
 edbdocker_setup_env() {
-  : "${EDGEDB_SERVER_ALLOW_INSECURE_HTTP_CLIENTS:=}"
+  : "${EDGEDB_SERVER_HTTP_ENDPOINT_SECURITY:=}"
   : "${EDGEDB_SERVER_SERVER_UID:=edgedb}"
+  : "${EDGEDB_SERVER_SERVER_BINARY:=edgedb-server}"
+  : "${EDGEDB_SERVER_DATADIR:=}"
+  : "${EDGEDB_SERVER_BACKEND_DSN:=}"
+  : "${EDGEDB_SERVER_PASSWORD:=}"
+  : "${EDGEDB_SERVER_PASSWORD_HASH:=}"
+  : "${EDGEDB_SERVER_SECURITY:=}"
+  : "${EDGEDB_SERVER_EMIT_SERVER_STATUS:=}"
+  : "${EDGEDB_SERVER_BOOTSTRAP_ONLY:=}"
+  : "${EDGEDB_SERVER_DEFAULT_AUTH_METHOD:=}"
+  : "${EDGEDB_SERVER_TLS_CERT_MODE:=}"
+  : "${EDGEDB_SERVER_TLS_CERT_FILE:=}"
+  : "${EDGEDB_SERVER_TLS_KEY_FILE:=}"
+  : "${EDGEDB_SERVER_BOOTSTRAP_SCRIPT_FILE:=}"
+  : "${EDGEDB_SERVER_BOOTSTRAP_COMMAND:=}"
+  : "${EDGEDB_SERVER_RUNSTATE_DIR:=/run/edgedb}"
 
-  if [ -n "${EDGEDB_SERVER_AUTH_METHOD}" ]; then
+  if [ -n "${EDGEDB_SERVER_AUTH_METHOD:-}" ]; then
     msg=(
       "======================================================="
       "WARNING: EDGEDB_SERVER_AUTH_METHOD is deprecated.      "
@@ -314,7 +357,7 @@ edbdocker_setup_env() {
     edbdocker_log_at_level "warning" "${msg[@]}"
   fi
 
-  if [ -n "${EDGEDB_SERVER_POSTGRES_DSN}" ]; then
+  if [ -n "${EDGEDB_SERVER_POSTGRES_DSN:-}" ]; then
     if [ -n "${EDGEDB_SERVER_BACKEND_DSN}" ]; then
       edbdocker_die "ERROR: EDGEDB_SERVER_POSTGRES_DSN and EDGEDB_SERVER_BACKEND_DSN are mutually exclusive, but both are set"
     else
@@ -325,7 +368,22 @@ edbdocker_setup_env() {
         "======================================================="
       )
       edbdocker_log_at_level "warning" "${msg[@]}"
-      export EDGEDB_SERVER_BACKEND_DSN="${EDGEDB_SERVER_POSTGRES_DSN}"
+      EDGEDB_SERVER_BACKEND_DSN="${EDGEDB_SERVER_POSTGRES_DSN}"
+    fi
+  fi
+
+  if [ -n "${EDGEDB_SERVER_GENERATE_SELF_SIGNED_CERT:-}" ]; then
+    if [ -n "${EDGEDB_SERVER_TLS_CERT_MODE}" ]; then
+      edbdocker_die "ERROR: EDGEDB_SERVER_GENERATE_SELF_SIGNED_CERT and EDGEDB_SERVER_TLS_CERT_MODE are mutually exclusive, but both are set"
+    else
+      msg=(
+        "======================================================="
+        "WARNING: EDGEDB_SERVER_GENERATE_SELF_SIGNED_CERT is deprecated.      "
+        "         Use EDGEDB_SERVER_TLS_CERT_MODE instead."
+        "======================================================="
+      )
+      edbdocker_log_at_level "warning" "${msg[@]}"
+      EDGEDB_SERVER_TLS_CERT_MODE="generate_self_signed"
     fi
   fi
 
@@ -339,38 +397,32 @@ edbdocker_setup_env() {
   edbdocker_lookup_env_var "EDGEDB_SERVER_BACKEND_DSN"
   edbdocker_lookup_env_var "EDGEDB_SERVER_TLS_KEY" "" true
   edbdocker_lookup_env_var "EDGEDB_SERVER_TLS_CERT" "" true
-  edbdocker_lookup_env_var "EDGEDB_SERVER_GENERATE_SELF_SIGNED_CERT"
+  edbdocker_lookup_env_var "EDGEDB_SERVER_TLS_CERT_MODE"
   edbdocker_lookup_env_var "EDGEDB_SERVER_BOOTSTRAP_COMMAND"
   edbdocker_lookup_env_var "EDGEDB_SERVER_DOCKER_LOG_LEVEL"
 
-  if [ -n "${EDGEDB_SERVER_DATADIR:-}" ] && [ -n "${EDGEDB_SERVER_BACKEND_DSN:-}" ]; then
-    edbdocker_die "ERROR: EDGEDB_SERVER_DATADIR and EDGEDB_SERVER_BACKEND_DSN are mutually exclusive, but both are set"
-  elif [ -z "${EDGEDB_SERVER_BACKEND_DSN}" ]; then
-    export EDGEDB_SERVER_DATADIR="${EDGEDB_SERVER_DATADIR:-/var/lib/edgedb/data}"
+  if [ -n "${EDGEDB_SERVER_TLS_KEY_FILE}" ] && [ -z "${EDGEDB_SERVER_TLS_CERT_FILE}" ]; then
+    edbdocker_die "ERROR: EDGEDB_SERVER_TLS_CERT_FILE must be set when EDGEDB_SERVER_TLS_KEY_FILE is set"
   fi
 
-  if [ -n "${EDGEDB_SERVER_PASSWORD:-}" ] && [ -n "${EDGEDB_SERVER_PASSWORD_HASH:-}" ]; then
+  if [ -n "${EDGEDB_SERVER_DATADIR}" ] && [ -n "${EDGEDB_SERVER_BACKEND_DSN}" ]; then
+    edbdocker_die "ERROR: EDGEDB_SERVER_DATADIR and EDGEDB_SERVER_BACKEND_DSN are mutually exclusive, but both are set"
+  elif [ -z "${EDGEDB_SERVER_BACKEND_DSN}" ]; then
+    EDGEDB_SERVER_DATADIR="${EDGEDB_SERVER_DATADIR:-/var/lib/edgedb/data}"
+  fi
+
+  if [ -n "${EDGEDB_SERVER_PASSWORD}" ] && [ -n "${EDGEDB_SERVER_PASSWORD_HASH}" ]; then
     edbdocker_die "ERROR: EDGEDB_SERVER_PASSWORD and EDGEDB_SERVER_PASSWORD_PASH are mutually exclusive, but both are set"
   fi
 
-  if [ -n "${EDGEDB_SERVER_BOOTSTRAP_SCRIPT_FILE:-}" ] && [ -n "${EDGEDB_SERVER_BOOTSTRAP_COMMAND:-}" ]; then
+  if [ -n "${EDGEDB_SERVER_BOOTSTRAP_SCRIPT_FILE}" ] && [ -n "${EDGEDB_SERVER_BOOTSTRAP_COMMAND}" ]; then
     edbdocker_die "ERROR: EDGEDB_SERVER_BOOTSTRAP_SCRIPT_FILE and EDGEDB_SERVER_BOOTSTRAP_COMMAND are mutually exclusive, but both are set"
   fi
 
-  if [ -n "${EDGEDB_SERVER_TLS_CERT_FILE:-}" ] && [ -n "${EDGEDB_SERVER_GENERATE_SELF_SIGNED_CERT:-}" ]; then
-    edbdocker_die "ERROR: EDGEDB_SERVER_TLS_CERT_FILE and EDGEDB_SERVER_GENERATE_SELF_SIGNED_CERT are mutually exclusive, but both are set"
-  fi
-
-  if [ -n "${EDGEDB_SERVER_TLS_KEY_FILE:-}" ] && [ -n "${EDGEDB_SERVER_GENERATE_SELF_SIGNED_CERT:-}" ]; then
-    edbdocker_die "ERROR: EDGEDB_SERVER_TLS_KEY_FILE and EDGEDB_SERVER_GENERATE_SELF_SIGNED_CERT are mutually exclusive, but both are set"
-  fi
-
-  export EDGEDB_SERVER_RUNSTATE_DIR="${EDGEDB_SERVER_RUNSTATE_DIR:-/run/edgedb}"
-
   if [ -n "${EDGEDB_SERVER_ALLOW_INSECURE_HTTP_CLIENTS:-}" ]; then
-    if [ -z "${EDGEDB_SERVER_HTTP_ENDPOINT_SECURITY:-}" ]; then
-      export EDGEDB_SERVER_HTTP_ENDPOINT_SECURITY="optional"
-    elif [ "${EDGEDB_SERVER_HTTP_ENDPOINT_SECURITY:-}" = "optional" ]; then
+    if [ -z "${EDGEDB_SERVER_HTTP_ENDPOINT_SECURITY}" ]; then
+      EDGEDB_SERVER_HTTP_ENDPOINT_SECURITY="optional"
+    elif [ "${EDGEDB_SERVER_HTTP_ENDPOINT_SECURITY}" = "optional" ]; then
       :
     else
       edbdocker_die "ERROR: EDGEDB_SERVER_ALLOW_INSECURE_HTTP_CLIENTS and EDGEDB_SERVER_HTTP_ENDPOINT_SECURITY are mutually exclusive, but both are set"
@@ -379,29 +431,45 @@ edbdocker_setup_env() {
 
   if [ "${EDGEDB_SERVER_SECURITY}" = "insecure_dev_mode" ]; then
     if [ -z "${EDGEDB_SERVER_TLS_CERT_FILE}" ] \
-       && [ -z "${EDGEDB_SERVER_TLS_KEY_FILE}" ]
+       && [ -z "${EDGEDB_SERVER_TLS_KEY_FILE}" ] \
+       && [ -z "${EDGEDB_SERVER_TLS_CERT_MODE}" ]
     then
-      export EDGEDB_SERVER_GENERATE_SELF_SIGNED_CERT=1
+      EDGEDB_SERVER_TLS_CERT_MODE="generate_self_signed"
     fi
 
     if [ -z "${EDGEDB_SERVER_PASSWORD}" ] \
        && [ -z "${EDGEDB_SERVER_PASSWORD_HASH}" ] \
        && [ "${EDGEDB_SERVER_DEFAULT_AUTH_METHOD}" = "default" ]
     then
-      export EDGEDB_SERVER_DEFAULT_AUTH_METHOD="Trust"
+      EDGEDB_SERVER_DEFAULT_AUTH_METHOD="Trust"
     fi
 
     if [ -z "${EDGEDB_SERVER_HTTP_ENDPOINT_SECURITY}" ]; then
-      export EDGEDB_SERVER_HTTP_ENDPOINT_SECURITY="optional"
+      EDGEDB_SERVER_HTTP_ENDPOINT_SECURITY="optional"
+    fi
+  fi
+
+  if [ "$EDGEDB_SERVER_TLS_CERT_MODE" = "generate_self_signed" ] \
+     && [ -z "${EDGEDB_SERVER_DATADIR}" ]
+  then
+    if [ -z "$EDGEDB_SERVER_TLS_CERT_FILE" ]; then
+      mkdir -p "/etc/ssl/edgedb"
+      chown -R "${EDGEDB_SERVER_SERVER_UID}" "/etc/ssl/edgedb/"
+      EDGEDB_SERVER_TLS_CERT_FILE="/etc/ssl/edgedb/edbtlscert.pem"
+    fi
+    if [ -z "$EDGEDB_SERVER_TLS_KEY_FILE" ]; then
+      mkdir -p "/etc/ssl/edgedb"
+      chown -R "${EDGEDB_SERVER_SERVER_UID}" "/etc/ssl/edgedb/"
+      EDGEDB_SERVER_TLS_KEY_FILE="/etc/ssl/edgedb/edbprivkey.pem"
     fi
   fi
 
   if [ "${EDGEDB_SERVER_DEFAULT_AUTH_METHOD}" = "default" ]; then
-    export EDGEDB_SERVER_DEFAULT_AUTH_METHOD="SCRAM"
+    EDGEDB_SERVER_DEFAULT_AUTH_METHOD="SCRAM"
   elif [ "${EDGEDB_SERVER_DEFAULT_AUTH_METHOD,,}" = "scram" ]; then
-    export EDGEDB_SERVER_DEFAULT_AUTH_METHOD="SCRAM"
+    EDGEDB_SERVER_DEFAULT_AUTH_METHOD="SCRAM"
   elif [ "${EDGEDB_SERVER_DEFAULT_AUTH_METHOD,,}" = "trust" ]; then
-    export EDGEDB_SERVER_DEFAULT_AUTH_METHOD="Trust"
+    EDGEDB_SERVER_DEFAULT_AUTH_METHOD="Trust"
   else
     edbdocker_die "ERROR: unsupported auth method: \"${EDGEDB_SERVER_DEFAULT_AUTH_METHOD}\""
   fi
@@ -439,7 +507,7 @@ edbdocker_lookup_env_var() {
   old_var="${var/EDGEDB_SERVER_/EDGEDB_}"
   old_file_var="${old_var}_FILE"
   deflt="${2:-}"
-  prefer_file="$3"
+  prefer_file="${3:-}"
   val="$deflt"
   var_val="${!var:-}"
   file_var_val="${!file_var:-}"
@@ -523,10 +591,10 @@ edbdocker_lookup_env_var() {
   fi
 
   if [ "${prefer_file}" = "true" ]; then
-    export "$file_var"="$file_var_val"
+    printf -v "$file_var" "%s" "$file_var_val"
     unset "$var"
   else
-    export "$var"="$val"
+    printf -v "$var" "%s" "$val"
     unset "$file_var"
   fi
 }
@@ -590,6 +658,7 @@ edbdocker_bootstrap_instance() {
   local bootstrap_opts
   local conn_opts
 
+  bootstrap_cmd=""
   bootstrap_opts=( "$@" )
 
   if [ -n "${EDGEDB_SERVER_BOOTSTRAP_SCRIPT_FILE}" ]; then
@@ -606,65 +675,63 @@ edbdocker_bootstrap_instance() {
     bootstrap_opts+=(--bootstrap-script="/edgedb-bootstrap.edgeql")
 
   else
-    if [ -z "${bootstrap_cmd}" ]; then
-      if [ -n "${EDGEDB_SERVER_PASSWORD_HASH:-}" ]; then
-        if [ "$EDGEDB_SERVER_USER" = "edgedb" ]; then
-          bootstrap_cmd="ALTER ROLE ${EDGEDB_SERVER_USER} { SET password_hash := '${EDGEDB_SERVER_PASSWORD_HASH}'; }"
-        else
-          bootstrap_cmd="CREATE SUPERUSER ROLE ${EDGEDB_SERVER_USER} { SET password_hash := '${EDGEDB_SERVER_PASSWORD_HASH}'; }"
-        fi
-      elif [ -n "$EDGEDB_SERVER_PASSWORD" ]; then
-        if [[ "$EDGEDB_SERVER_USER" = "edgedb" ]]; then
-          bootstrap_cmd="ALTER ROLE ${EDGEDB_SERVER_USER} { SET password := '${EDGEDB_SERVER_PASSWORD}'; }"
-        else
-          bootstrap_cmd="CREATE SUPERUSER ROLE ${EDGEDB_SERVER_USER} { SET password := '${EDGEDB_SERVER_PASSWORD}'; }"
-        fi
-      elif [ "${EDGEDB_SERVER_DEFAULT_AUTH_METHOD:-}" = "Trust" ] ; then
-        if ! edbdocker_server_supports "--default-auth-method"; then
-          bootstrap_cmd="CONFIGURE SYSTEM INSERT Auth {priority := 0, method := (INSERT Trust)};"
-        fi
-        msg=(
-          "================================================================"
-          "                          WARNING                               "
-          "                          -------                               "
-          "                                                                "
-          "EDGEDB_SERVER_DEFAULT_AUTH_METHOD is set to 'Trust'.  This will "
-          "allow unauthenticated access to this EdgeDB instance for all who"
-          "have access to the database port! This might include other      "
-          "containers or processes on the same host and, if port ${EDGEDB_SERVER_PORT}"
-          "is bound to an accessible interface on the host, other machines "
-          "on the network.                                                 "
-          "                                                                "
-          "Use only for DEVELOPMENT and TESTING in a known environment     "
-          "without sensitive data.  Otherwise, it is strongly recommended  "
-          "to use password authentication via the EDGEDB_SERVER_PASSWORD   "
-          "or EDGEDB_SERVER_PASSWORD_HASH environment variables.           "
-          "================================================================"
-        )
-        edbdocker_log_at_level "warning" "${msg[@]}"
+    if [ -n "${EDGEDB_SERVER_PASSWORD_HASH}" ]; then
+      if [ "$EDGEDB_SERVER_USER" = "edgedb" ]; then
+        bootstrap_cmd="ALTER ROLE ${EDGEDB_SERVER_USER} { SET password_hash := '${EDGEDB_SERVER_PASSWORD_HASH}'; }"
       else
-        msg=(
-          "================================================================"
-          "                           ERROR                                "
-          "                           -----                                "
-          "                                                                "
-          "The EdgeDB instance at the specified location is not initialized"
-          "and superuser password has not been specified. Please set either"
-          "the EDGEDB_SERVER_PASSWORD or the EDGEDB_SERVER_PASSWORD_FILE   "
-          "environment variable to a non-empty value.                      "
-          "                                                                "
-          "For example:                                                    "
-          "                                                                "
-          "$ docker run -e EDGEDB_SERVER_PASSWORD_FILE=/pass edgedb/edgedb "
-          "                                                                "
-          "Alternatively, if doing local development and database security "
-          "is not a concern, set the EDGEDB_SERVER_SECURITY environment    "
-          "variable to 'insecure_dev_mode' value, which would disable      "
-          "password authentication and let this EdgeDB server use a self-  "
-          "signed TLS certificate.                                         "
-        )
-        edbdocker_die "${msg[@]}"
+        bootstrap_cmd="CREATE SUPERUSER ROLE ${EDGEDB_SERVER_USER} { SET password_hash := '${EDGEDB_SERVER_PASSWORD_HASH}'; }"
       fi
+    elif [ -n "${EDGEDB_SERVER_PASSWORD}" ]; then
+      if [[ "$EDGEDB_SERVER_USER" = "edgedb" ]]; then
+        bootstrap_cmd="ALTER ROLE ${EDGEDB_SERVER_USER} { SET password := '${EDGEDB_SERVER_PASSWORD}'; }"
+      else
+        bootstrap_cmd="CREATE SUPERUSER ROLE ${EDGEDB_SERVER_USER} { SET password := '${EDGEDB_SERVER_PASSWORD}'; }"
+      fi
+    elif [ "${EDGEDB_SERVER_DEFAULT_AUTH_METHOD}" = "Trust" ] ; then
+      if ! edbdocker_server_supports "--default-auth-method"; then
+        bootstrap_cmd="CONFIGURE SYSTEM INSERT Auth {priority := 0, method := (INSERT Trust)};"
+      fi
+      msg=(
+        "================================================================"
+        "                          WARNING                               "
+        "                          -------                               "
+        "                                                                "
+        "EDGEDB_SERVER_DEFAULT_AUTH_METHOD is set to 'Trust'.  This will "
+        "allow unauthenticated access to this EdgeDB instance for all who"
+        "have access to the database port! This might include other      "
+        "containers or processes on the same host and, if port ${EDGEDB_SERVER_PORT}"
+        "is bound to an accessible interface on the host, other machines "
+        "on the network.                                                 "
+        "                                                                "
+        "Use only for DEVELOPMENT and TESTING in a known environment     "
+        "without sensitive data.  Otherwise, it is strongly recommended  "
+        "to use password authentication via the EDGEDB_SERVER_PASSWORD   "
+        "or EDGEDB_SERVER_PASSWORD_HASH environment variables.           "
+        "================================================================"
+      )
+      edbdocker_log_at_level "warning" "${msg[@]}"
+    else
+      msg=(
+        "================================================================"
+        "                           ERROR                                "
+        "                           -----                                "
+        "                                                                "
+        "The EdgeDB instance at the specified location is not initialized"
+        "and superuser password has not been specified. Please set either"
+        "the EDGEDB_SERVER_PASSWORD or the EDGEDB_SERVER_PASSWORD_FILE   "
+        "environment variable to a non-empty value.                      "
+        "                                                                "
+        "For example:                                                    "
+        "                                                                "
+        "$ docker run -e EDGEDB_SERVER_PASSWORD_FILE=/pass edgedb/edgedb "
+        "                                                                "
+        "Alternatively, if doing local development and database security "
+        "is not a concern, set the EDGEDB_SERVER_SECURITY environment    "
+        "variable to 'insecure_dev_mode' value, which would disable      "
+        "password authentication and let this EdgeDB server use a self-  "
+        "signed TLS certificate.                                         "
+      )
+      edbdocker_die "${msg[@]}"
     fi
 
     if [ -n "$bootstrap_cmd" ]; then
@@ -689,55 +756,11 @@ _edbdocker_bootstrap_cb() {
   local -a conn_opts
   local dir
 
-  if [ -z "${EDGEDB_SERVER_HIDE_GENERATED_CERT}" ]; then
-    if [ -n "${EDGEDB_SERVER_DATADIR}" ] \
-       && [ -n "${EDGEDB_SERVER_GENERATE_SELF_SIGNED_CERT}" ]
-    then
-      local -a link_opts
-
-      link_opts+=( "-P" "<published-port>" )
-
-      if [ "${EDGEDB_SERVER_USER}" != "edgedb" ]; then
-        link_opts+=( "-u" "${EDGEDB_SERVER_USER}" )
-      fi
-
-      msg=(
-        "================================================================"
-        "                             NOTICE                             "
-        "                             ------                             "
-        "                                                                "
-        "A TLS certificate has been generated as 'edbtlscert.pem' in the "
-        "server data directory ('${EDGEDB_SERVER_DATADIR}' in this       "
-        "container).                                                     "
-        "                                                                "
-        "If you have the EdgeDB CLI installed on the host system, you can"
-        "also persist the authentication credentials and the certificate "
-        "by running:                                                     "
-        "                                                                "
-        "  edgedb ${link_opts[*]} instance link --trust-tls-cert my_instance"
-        "                                                                "
-        "You can then connect to the instance by running:                "
-        "                                                                "
-        "  edgedb -I my_instance                                       "
-        "                                                                "
-        "If you with to use the generated certificate manually, it is    "
-        "printed below.  Please remember to include the BEGIN and END    "
-        "CERTIFICATE lines.                                              "
-        "                                                                "
-      )
-      edbdocker_log_at_level "info" "${msg[@]}"
-      edbdocker_log_at_level "info" "$(cat "${EDGEDB_SERVER_DATADIR}"/edbtlscert.pem)"
-      msg=(
-        "                                                                "
-        "                                                                "
-        "================================================================"
-      )
-      edbdocker_log_at_level "info" "${msg[@]}"
-    fi
-  fi
-
   dir="/edgedb-bootstrap.d"
   conn_opts+=( "$@" )
+
+  _edbdocker_print_last_generated_cert_if_needed \
+    "$EDGEDB_DOCKER_LAST_SERVER_STATUS"
 
   if [ "$EDGEDB_SERVER_DATABASE" != "edgedb" ]; then
     echo "CREATE DATABASE \`${EDGEDB_SERVER_DATABASE}\`;" \
@@ -829,7 +852,7 @@ edbdocker_cli() {
 }
 
 
-edbdocker_die_no_tls_cert() {
+edbdocker_log_no_tls_cert() {
   local msg
   msg=(
     "======================================================================="
@@ -839,15 +862,12 @@ edbdocker_die_no_tls_cert() {
     "EdgeDB server requires a TLS certificate and a corresponding private   "
     "key to operate.  You can either provide them by setting the            "
     "EDGEDB_SERVER_TLS_CERT_FILE and EDGEDB_SERVER_TLS_KEY_FILE environment "
-    "variables, or set EDGEDB_SERVER_GENERATE_SELF_SIGNED_CERT to generate  "
-    "the certificate automatically.                                         "
-    "                                                                       "
-    "Example:                                                               "
-    "                                                                       "
-    "  docker run -e EDGEDB_SERVER_GENERATE_SELF_SIGNED_CERT=1 edgedb/edgedb"
+    "variables to an existing certificate and private key, or set           "
+    "EDGEDB_SERVER_TLS_CERT_MODE=generate_self_signed to generate           "
+    "a self-signed certificate automatically.                               "
     "======================================================================="
   )
-  edbdocker_die "${msg[@]}"
+  edbdocker_log_at_level "error" "${msg[@]}"
 }
 
 
@@ -874,14 +894,14 @@ edbdocker_log() {
 # Log arguments to stderr using `edbdocker_log` and exit with 1.
 edbdocker_die() {
   edbdocker_log "${@}"
-  exit 1
+  exit $EDGEDB_DOCKER_ABORT_CODE
 }
 
 edbdocker_log_at_level() {
   local level=$1
   shift 1
 
-  if ! [[ ${_edbdocker_log_levels[$level]} ]]; then
+  if [ -z "${_edbdocker_log_levels[$level]:-}" ]; then
     edbdocker_die "unknown level passed to edbdocker_log_at_level: \"$level\""
   fi
 
@@ -912,17 +932,19 @@ edbdocker_server_supports() {
 # Usage: `edbdocker_run_temp_server callback abort_callback --server-arg=val ...`
 edbdocker_run_temp_server() {
   local edgedb_pid
-  local shell_pid
   local timeout_pid
   local timeout
-  local retry_period
   local runstate_dir
   local port
   local ecode
-  local server_opts
   local conn_opts
   local callback
+  local abort_callback
   local result
+  local status_file
+  local tls_cert_file
+  local status
+  local -a server_opts
 
   result=0
   callback="$1"
@@ -936,41 +958,44 @@ edbdocker_run_temp_server() {
     server_opts+=(--data-dir="${EDGEDB_SERVER_DATADIR}")
   fi
 
-  if edbdocker_server_supports "--generate-self-signed-cert"; then
-    if [ -n "${EDGEDB_SERVER_GENERATE_SELF_SIGNED_CERT}" ]; then
+  if [ -n "${EDGEDB_SERVER_TLS_CERT_MODE}" ]; then
+    if edbdocker_server_supports "--tls-cert-mode"; then
+      server_opts+=(--tls-cert-mode="${EDGEDB_SERVER_TLS_CERT_MODE}")
+    elif [ "${EDGEDB_SERVER_TLS_CERT_MODE}" = "generate_self_signed" ] \
+         && edbdocker_server_supports "--generate-self-signed-cert"
+    then
       server_opts+=(--generate-self-signed-cert)
-    elif [ -n "${EDGEDB_SERVER_TLS_CERT_FILE}" ] || [ -n "${EDGEDB_SERVER_TLS_KEY_FILE}" ]; then
-      if [ -n "${EDGEDB_SERVER_TLS_CERT_FILE}" ]; then
-        server_opts+=(--tls-cert-file="${EDGEDB_SERVER_TLS_CERT_FILE}")
-      fi
-      if [ -n "${EDGEDB_SERVER_TLS_KEY_FILE}" ]; then
-        server_opts+=(--tls-key-file="${EDGEDB_SERVER_TLS_KEY_FILE}")
-      fi
-    elif [ -z "${EDGEDB_SERVER_DATADIR}" ] || [ ! -f "${EDGEDB_SERVER_DATADIR}/edbtlscert.pem" ]; then
-      edbdocker_die_no_tls_cert
     fi
   fi
 
+  if [ -n "${EDGEDB_SERVER_TLS_CERT_FILE}" ]; then
+    server_opts+=(--tls-cert-file="${EDGEDB_SERVER_TLS_CERT_FILE}")
+  fi
+
+  if [ -n "${EDGEDB_SERVER_TLS_KEY_FILE}" ]; then
+    server_opts+=(--tls-key-file="${EDGEDB_SERVER_TLS_KEY_FILE}")
+  fi
+
   runstate_dir="$(edbdocker_mktemp_for_server -d)"
+  status_file="$(edbdocker_mktemp_for_server)"
 
   server_opts+=(
     --runstate-dir="$runstate_dir"
     --port="auto"
     --bind-address="127.0.0.1"
+    --emit-server-status="$status_file"
   )
-  conn_opts=( --admin --host="$runstate_dir" --wait-until-available="2s" )
 
   # Start the server
   if [ "$(id -u)" = "0" ]; then
     gosu "${EDGEDB_SERVER_SERVER_UID}" \
-      "${EDGEDB_SERVER_SERVER_BINARY:-edgedb-server}" "${server_opts[@]}" &
+      "${EDGEDB_SERVER_SERVER_BINARY}" "${server_opts[@]}" &
   else
-    "${EDGEDB_SERVER_SERVER_BINARY:-edgedb-server}" "${server_opts[@]}" &
+    "${EDGEDB_SERVER_SERVER_BINARY}" "${server_opts[@]}" &
   fi
   edgedb_pid="$!"
 
   timeout=120
-  retry_period=5
 
   function _abort() {
     if [ -e "${runstate_dir}" ]; then
@@ -982,93 +1007,60 @@ edbdocker_run_temp_server() {
     result=1
   }
 
-  (
-    local port
-    local sock
+  status=$(_edbdocker_wait_for_status "$status_file" "$edgedb_pid" "$timeout")
 
-    shopt -s nullglob  # to properly match the Unix socket
+  if [ -n "$status" ]; then
+    port=$(echo "$status" | jq -r ".port")
+    tls_cert_file=$(echo "$status" | jq -r ".tls_cert_file")
 
-    for _ in $(seq 1 $((timeout / retry_period))); do
-      sleep $retry_period
-      if compgen -G "${runstate_dir}/.s.EDGEDB.admin.*" >/dev/null; then
-        break
-      fi
-    done
-
-    for sock in "${runstate_dir}/.s.EDGEDB.admin."*; do
-      port="${sock##*.}"
-      break
-    done
-
-    if [ -z "${port}" ]; then
-      _abort "ERROR: Server socket did not appear within ${timeout} seconds."
-    fi
-
-    check_args=(
+    conn_opts=(
       --admin
-      --host="${runstate_dir}"
+      --host="$runstate_dir"
       --port="${port}"
-      --database="edgedb"
       --wait-until-available="2s"
-      query "SELECT 1"
+      --tls-ca-file="${tls_cert_file}"
     )
 
-    if ! edbdocker_cli "${check_args[@]}" >/dev/null; then
-      _abort ""
-    fi
+    if ! edbdocker_cli "${conn_opts[@]}" query "SELECT 1" >/dev/null; then
+      status=""
+    else
+      EDGEDB_DOCKER_LAST_SERVER_STATUS="$status"
 
-    sleep 1
-  ) &
-  timeout_pid="$!"
+      if [ -n "${callback}" ]; then
+        if ! $callback "${conn_opts[@]}"; then
+          result=$?
+        fi
+      fi
+    fi
+  fi
 
   set +e
+  kill "$edgedb_pid" 2>/dev/null
+  sleep 10 &
+  timeout_pid="$!"
   wait -n "$edgedb_pid" "$timeout_pid"
   ecode=$?
-  if [ $ecode -eq 0 ]; then
-    # The first succeeding task would be the server due
-    # to a trailing sleep above.
-    wait "$timeout_pid"
-    ecode=$?
-  else
-    kill "$timeout_pid"
-  fi
-  if [ $ecode -ne 0 ]; then
-    _abort "ERROR: Could not bootstrap EdgeDB server instance."
-    return $ecode
-  fi
   set -e
 
-  for sock in "${runstate_dir}/.s.EDGEDB.admin."*; do
-    port="${sock##*.}"
-    break
-  done
-
-  if [ -z "${port}" ]; then
-    _abort "ERROR: EdgeDB server seems to have died before bootstrap could complete."
-    return 1
-  fi
-
-  conn_opts+=( --port="${port}" )
-
-  if [ -n "${callback}" ]; then
-    if ! $callback "${conn_opts[@]}"; then
-      result=$?
+  if kill -9 "$edgedb_pid" 2>/dev/null; then
+    if [ $ecode -eq 0 ]; then
+      ecode=124
     fi
   fi
 
-  shell_pid=$$
-  trap "_abort" USR1
+  if [ -z "$status" ] && [ $ecode -eq 0 ]; then
+    # This means server did not produce the READY status in $timeout seconds.
+    ecode=1
+  fi
 
-  kill $edgedb_pid
-  (
-    sleep 10;
-    edbdocker_log "ERROR: Could not complete bootstrap: server did not stop within 10 seconds."
-    kill -USR1 $shell_pid
-  ) &
-  timeout_pid=$!
-  wait $edgedb_pid
-  kill $timeout_pid
-  trap - USR1
+  if [ $ecode -ne 0 ]; then
+    if [ $ecode -eq 10 ]; then
+      edbdocker_log_no_tls_cert
+    fi
+    _abort "ERROR: Could not complete instance bootstrap"
+  fi
+
+  result=$ecode
 
   rm -r "${runstate_dir}" || :
 
@@ -1088,21 +1080,89 @@ edbdocker_mktemp_for_server() {
 }
 
 
-_edbdocker_watch_cert() {
-  ( tail -f /tmp/edb_server_status & ) | grep -q READY
-  cert_path=$(grep READY /tmp/edb_server_status | sed -n 's/.*"tls_cert_file" *: *"\([^"]*\)".*/\1/p')
-  rm /tmp/edb_server_status
+_edbdocker_wait_for_status() {
+  local status_file
+  local server_pid
+  local timeout
+  local status
+  local line
+  local -a tail_args
+
+  status=""
+  status_file="$1"
+  server_pid="${2:-}"
+  timeout="${3:-0}"
+
+  tail_args=( -f "$status_file" )
+  if [ -n "$server_pid" ]; then
+    tail_args+=( --pid="$server_pid" )
+  fi
+
+  while IFS= read -r line; do
+    if [[ $line == READY=* ]]; then
+      status="${line#READY=}"
+      break
+    fi
+  done < <(timeout "$timeout" tail "${tail_args[@]}")
+
+  rm -rf "$status_file" || :
+
+  echo "$status"
+}
+
+
+_edbdocker_print_last_generated_cert_if_needed() {
+  local -a link_opts
+  local tls_cert_file
+  local tls_cert_new
+  local status
+  local msg
+
+  status="$1"
+
+  tls_cert_new=$(echo "$status" | jq -r ".tls_cert_newly_generated")
+
+  if [ "${tls_cert_new}" != "true" ] || [ -n "${EDGEDB_SERVER_HIDE_GENERATED_CERT:-}" ]; then
+    return
+  fi
+
+  tls_cert_file=$(echo "$status" | jq -r ".tls_cert_file")
+
+  link_opts+=( "-P" "<published-port>" )
+
+  if [ "${EDGEDB_SERVER_USER}" != "edgedb" ]; then
+    link_opts+=( "-u" "${EDGEDB_SERVER_USER}" )
+  fi
+
   msg=(
-    "=============================================================== "
-    "NOTICE: TLS certificate is generated at the following path:     "
-    "            ${cert_path}                                        "
+    "================================================================"
+    "                             NOTICE                             "
+    "                             ------                             "
     "                                                                "
-    "        For your convenience, the generated certificate is      "
-    "        echoed below. Please remember to include the BEGIN      "
-    "        and END CERTIFICATE lines, and use this certificate     "
-    "        to establish connections to this EdgeDB instance:       "
-    "=============================================================== "
+    "A self-signed TLS certificate has been generated and placed in  "
+    "'${tls_cert_file}' in this container.                           "
+    "                                                                "
+    "If you have the EdgeDB CLI installed on the host system, you can"
+    "persist the authentication credentials and the certificate by   "
+    "running:                                                        "
+    "                                                                "
+    "  edgedb ${link_opts[*]} instance link --trust-tls-cert my_instance"
+    "                                                                "
+    "You can then connect to the instance by running:                "
+    "                                                                "
+    "  edgedb -I my_instance                                         "
+    "                                                                "
+    "If you wish to use the generated certificate manually, it is    "
+    "printed below.  Please remember to include the BEGIN and END    "
+    "CERTIFICATE lines.                                              "
+    "                                                                "
   )
   edbdocker_log_at_level "info" "${msg[@]}"
-  edbdocker_log_at_level "info" "$(cat "${cert_path}")"
+  edbdocker_log_at_level "info" "$(cat "${tls_cert_file}")"
+  msg=(
+    "                                                                "
+    "                                                                "
+    "================================================================"
+  )
+  edbdocker_log_at_level "info" "${msg[@]}"
 }

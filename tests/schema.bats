@@ -3,7 +3,7 @@ instances=()
 
 setup() {
     slot=$(
-        curl https://packages.edgedb.com/apt/.jsonindexes/stretch.nightly.json \
+        curl https://packages.edgedb.com/apt/.jsonindexes/buster.nightly.json \
         | jq -r '[.packages[] | select(.basename == "edgedb-server")] | sort_by(.slot) | reverse | .[0].slot')
     docker build -t edgedb/edgedb:latest \
         --build-arg "version=$slot" --build-arg "subdist=.nightly" \
@@ -33,7 +33,7 @@ teardown() {
     docker run -d --name=$container_id --publish=5656 \
         --env=EDGEDB_SERVER_USER=user1 \
         --env=EDGEDB_SERVER_PASSWORD=password2 \
-        --env=EDGEDB_SERVER_GENERATE_SELF_SIGNED_CERT=1 \
+        --env=EDGEDB_SERVER_TLS_CERT_MODE=generate_self_signed \
         edgedb-test:schema
     port=$(docker inspect "$container_id" \
         | jq -r '.[0].NetworkSettings.Ports["5656/tcp"][0].HostPort')

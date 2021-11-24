@@ -33,12 +33,14 @@ EdgeDB servers.
 The simplest way to run the image (without data persistence) is this:
 
 ```shell
-$ docker run --name edgedb -e EDGEDB_SERVER_PASSWORD=secret \
-    -e EDGEDB_SERVER_GENERATE_SELF_SIGNED_CERT=1 -d edgedb/edgedb
+$ docker run --name edgedb -d \
+    -e EDGEDB_SERVER_PASSWORD=secret \
+    -e EDGEDB_SERVER_TLS_CERT_MODE=generate_self_signed \
+    edgedb/edgedb
 ```
 
 See the [Customization](#customization) section below for the meaning of
-the `EDGEDB_SERVER_PASSWORD` variable and other options.
+the `EDGEDB_SERVER_SECURITY` variable and other options.
 
 Then, to authenticate to the EdgeDB instance and store the credentials in
 a Docker volume, run:
@@ -66,7 +68,7 @@ you must mount a persistent volume at the path specified by
 ```shell
 $ docker run \
     --name edgedb -e EDGEDB_SERVER_PASSWORD=secret \
-    -e EDGEDB_SERVER_GENERATE_SELF_SIGNED_CERT=1 \
+    -e EDGEDB_SERVER_TLS_CERT_MODE=generate_self_signed \
     -v /my/data/directory:/var/lib/edgedb/data \
     -d edgedb/edgedb
 ```
@@ -77,7 +79,7 @@ Note that on Windows you must use a Docker volume instead:
 $ docker volume create --name=edgedb-data
 $ docker run \
     --name edgedb -e EDGEDB_SERVER_PASSWORD=secret \
-    -e EDGEDB_SERVER_GENERATE_SELF_SIGNED_CERT=1 \
+    -e EDGEDB_SERVER_TLS_CERT_MODE=generate_self_signed \
     -v edgedb-data:/var/lib/edgedb/data \
     -d edgedb/edgedb
 ```
