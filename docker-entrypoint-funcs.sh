@@ -8,20 +8,19 @@ declare -A _edbdocker_log_levels=(
   [error]=4
 )
 
-_edbdocker_log_level="info"
 
 edbdocker_setup_shell() {
   set -Eeu -o pipefail
   shopt -s dotglob inherit_errexit nullglob compat"${BASH_COMPAT=42}"
-  if [[ -n ${EDGEDB_SERVER_DOCKER_LOG_LEVEL+x} ]]; then
-    _edbdocker_log_level="${EDGEDB_SERVER_DOCKER_LOG_LEVEL,,}"
+  : "${EDGEDB_DOCKER_LOG_LEVEL:=${EDGEDB_SERVER_DOCKER_LOG_LEVEL:-info}}"
 
-    if [ -z "${_edbdocker_log_levels[$_edbdocker_log_level]:-}" ]; then
-      edbdocker_die "unknown level passed to EDGEDB_SERVER_DOCKER_LOG_LEVEL: \"$EDGEDB_SERVER_DOCKER_LOG_LEVEL\""
-    fi
+  EDGEDB_DOCKER_LOG_LEVEL="${EDGEDB_DOCKER_LOG_LEVEL,,}"
+
+  if [ -z "${_edbdocker_log_levels[$EDGEDB_DOCKER_LOG_LEVEL]:-}" ]; then
+    edbdocker_die "unknown level passed to EDGEDB_DOCKER_LOG_LEVEL: \"$EDGEDB_DOCKER_LOG_LEVEL\", supported values are "
   fi
 
-  if [ "$_edbdocker_log_level" == "trace" ]; then
+  if [ "$EDGEDB_DOCKER_LOG_LEVEL" == "trace" ]; then
     set -x
     export PS4='+($(basename ${BASH_SOURCE}):${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
   fi
@@ -329,6 +328,8 @@ edbdocker_run_server() {
 
 # Populate important environment variables and make sure they are sane.
 edbdocker_setup_env() {
+  : "${EDGEDB_DOCKER_SHOW_GENERATED_CERT:=default}"
+  : "${EDGEDB_DOCKER_APPLY_MIGRATIONS:=default}"
   : "${EDGEDB_SERVER_HTTP_ENDPOINT_SECURITY:=}"
   : "${EDGEDB_SERVER_SERVER_UID:=edgedb}"
   : "${EDGEDB_SERVER_SERVER_BINARY:=edgedb-server}"
@@ -346,6 +347,53 @@ edbdocker_setup_env() {
   : "${EDGEDB_SERVER_BOOTSTRAP_SCRIPT_FILE:=}"
   : "${EDGEDB_SERVER_BOOTSTRAP_COMMAND:=}"
   : "${EDGEDB_SERVER_RUNSTATE_DIR:=/run/edgedb}"
+
+  if [ "${EDGEDB_DOCKER_SHOW_GENERATED_CERT}" = "default" ]; then
+    EDGEDB_DOCKER_SHOW_GENERATED_CERT="always"
+  elif [ "${EDGEDB_DOCKER_SHOW_GENERATED_CERT}" = "always" ] \
+       || [ "${EDGEDB_DOCKER_SHOW_GENERATED_CERT}" = "always" ]
+  then
+    :
+  else
+    edbdocker_die "ERROR: invalid value for EDGEDB_DOCKER_SHOW_GENERATED_CERT: ${EDGEDB_DOCKER_SHOW_GENERATED_CERT}, supported values are: always, never, default."
+  fi
+
+  if [ -n "${EDGEDB_SERVER_SKIP_MIGRATIONS:-}" ]; then
+    if [ -n "${EDGEDB_DOCKER_APPLY_MIGRATIONS}" ]; then
+      if [ "${EDGEDB_DOCKER_APPLY_MIGRATIONS}" = "never" ]; then
+        edbdocker_die "ERROR: EDGEDB_SERVER_SKIP_MIGRATIONS and EDGEDB_DOCKER_APPLY_MIGRATIONS are mutually exclusive, but both are set"
+      fi
+    else
+      msg=(
+        "=========================================================="
+        "WARNING: EDGEDB_SERVER_SKIP_MIGRATIONS is deprecated.     "
+        "         Use EDGEDB_DOCKER_APPLY_MIGRATIONS=never instead."
+        "=========================================================="
+      )
+      edbdocker_log_at_level "warning" "${msg[@]}"
+      EDGEDB_DOCKER_APPLY_MIGRATIONS="never"
+    fi
+  fi
+
+  if [ "${EDGEDB_DOCKER_APPLY_MIGRATIONS}" = "default" ]; then
+    EDGEDB_DOCKER_APPLY_MIGRATIONS="always"
+  elif [ "${EDGEDB_DOCKER_APPLY_MIGRATIONS}" = "always" ] \
+       || [ "${EDGEDB_DOCKER_APPLY_MIGRATIONS}" = "always" ]
+  then
+    :
+  else
+    edbdocker_die "ERROR: invalid value for EDGEDB_DOCKER_APPLY_MIGRATIONS: ${EDGEDB_DOCKER_APPLY_MIGRATIONS}, supported values are: always, never, default."
+  fi
+
+  if [ -n "${EDGEDB_DOCKER_:-}" ]; then
+    msg=(
+      "======================================================="
+      "WARNING: EDGEDB_SERVER_AUTH_METHOD is deprecated.      "
+      "         Use EDGEDB_SERVER_DEFAULT_AUTH_METHOD instead."
+      "======================================================="
+    )
+    edbdocker_log_at_level "warning" "${msg[@]}"
+  fi
 
   if [ -n "${EDGEDB_SERVER_AUTH_METHOD:-}" ]; then
     msg=(
@@ -399,7 +447,6 @@ edbdocker_setup_env() {
   edbdocker_lookup_env_var "EDGEDB_SERVER_TLS_CERT" "" true
   edbdocker_lookup_env_var "EDGEDB_SERVER_TLS_CERT_MODE"
   edbdocker_lookup_env_var "EDGEDB_SERVER_BOOTSTRAP_COMMAND"
-  edbdocker_lookup_env_var "EDGEDB_SERVER_DOCKER_LOG_LEVEL"
 
   if [ -n "${EDGEDB_SERVER_TLS_KEY_FILE}" ] && [ -z "${EDGEDB_SERVER_TLS_CERT_FILE}" ]; then
     edbdocker_die "ERROR: EDGEDB_SERVER_TLS_CERT_FILE must be set when EDGEDB_SERVER_TLS_KEY_FILE is set"
@@ -798,7 +845,7 @@ _edbdocker_bootstrap_cb() {
     done
   fi
 
-  if [ -d "/dbschema" ] && [ -z "${EDGEDB_SERVER_SKIP_MIGRATIONS:-}" ]; then
+  if [ -d "/dbschema" ] && [ "${EDGEDB_DOCKER_APPLY_MIGRATIONS}" != "never" ]; then
     _edbdocker_migrations_cb "${conn_opts[@]}"
   fi
 }
@@ -891,25 +938,34 @@ edbdocker_log() {
 }
 
 
-# Log arguments to stderr using `edbdocker_log` and exit with 1.
+# Log arguments to stderr using `edbdocker_log` and exit with
+# $EDGEDB_DOCKER_ABORT_CODE.
 edbdocker_die() {
   edbdocker_log "${@}"
   exit $EDGEDB_DOCKER_ABORT_CODE
 }
 
-edbdocker_log_at_level() {
-  local level=$1
-  shift 1
 
-  if [ -z "${_edbdocker_log_levels[$level]:-}" ]; then
+# Usage: edbdocker_log_at_level <level> args...
+# Logs arguments to stderr if the specified <level> is greater or equal
+# to the configured EDGEDB_DOCKER_LOG_LEVEL.
+edbdocker_log_at_level() {
+  local level
+  local msg_level_no
+  local output_level_no
+
+  level=$1
+  shift 1
+  msg_level_no="${_edbdocker_log_levels[$level]:-}"
+  output_level_no="${_edbdocker_log_levels[${EDGEDB_DOCKER_LOG_LEVEL:-info}]}"
+
+  if [ -z "$msg_level_no" ]; then
     edbdocker_die "unknown level passed to edbdocker_log_at_level: \"$level\""
   fi
 
-  if (( ${_edbdocker_log_levels[$level]} < ${_edbdocker_log_levels[$_edbdocker_log_level]} )); then
-    return 0
+  if [ "$msg_level_no" -ge "$output_level_no" ]; then
+    edbdocker_log "${@}"
   fi
-
-  edbdocker_log "${@}"
 }
 
 
@@ -1122,7 +1178,9 @@ _edbdocker_print_last_generated_cert_if_needed() {
 
   tls_cert_new=$(echo "$status" | jq -r ".tls_cert_newly_generated")
 
-  if [ "${tls_cert_new}" != "true" ] || [ -n "${EDGEDB_SERVER_HIDE_GENERATED_CERT:-}" ]; then
+  if [ "${tls_cert_new}" != "true" ] \
+     || [ "${EDGEDB_DOCKER_SHOW_GENERATED_CERT}" = "never" ]
+  then
     return
   fi
 

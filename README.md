@@ -91,8 +91,8 @@ cluster specified by `EDGEDB_SERVER_BACKEND_DSN`.  See below for details.
 
 A derived image may include application schema and migrations in
 `/dbschema`, in which case the container will attempt to apply the
-schema migrations found in `/dbschema/migrations`, unless
-the `EDGEDB_SERVER_SKIP_MIGRATIONS` environment variable is set.
+schema migrations found in `/dbschema/migrations`, unless the
+`EDGEDB_DOCKER_APPLY_MIGRATIONS` environment variable is set to `never`.
 
 ## Customization
 
@@ -175,10 +175,10 @@ user and database creation, and other initial setup. If neither the
 will look for the presence of `/edgedb-bootstrap.edgeql` in the container
 (which can be placed in a derived image).
 
-#### `EDGEDB_SERVER_DOCKER_LOG_LEVEL`
+#### `EDGEDB_DOCKER_LOG_LEVEL`
 
 Determines the log verbosity level in the entrypoint script. Valid levels are
-`trace`, `debug`, `info`, and `warning`.  The default is `info`.
+`trace`, `debug`, `info`, `warning`, and `error`.  The default is `info`.
 
 #### Custom scripts in `/edgedb-bootstrap.d/
 
