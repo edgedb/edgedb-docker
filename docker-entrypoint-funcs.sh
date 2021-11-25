@@ -452,6 +452,10 @@ edbdocker_setup_env() {
     edbdocker_die "ERROR: EDGEDB_SERVER_TLS_CERT_FILE must be set when EDGEDB_SERVER_TLS_KEY_FILE is set"
   fi
 
+  if [ -n "${EDGEDB_SERVER_TLS_CERT_FILE}" ] && [ -z "${EDGEDB_SERVER_TLS_KEY_FILE}" ]; then
+    edbdocker_die "ERROR: EDGEDB_SERVER_TLS_KEY_FILE must be set when EDGEDB_SERVER_TLS_CERT_FILE is set"
+  fi
+
   if [ -n "${EDGEDB_SERVER_DATADIR}" ] && [ -n "${EDGEDB_SERVER_BACKEND_DSN}" ]; then
     edbdocker_die "ERROR: EDGEDB_SERVER_DATADIR and EDGEDB_SERVER_BACKEND_DSN are mutually exclusive, but both are set"
   elif [ -z "${EDGEDB_SERVER_BACKEND_DSN}" ]; then
@@ -478,7 +482,6 @@ edbdocker_setup_env() {
 
   if [ "${EDGEDB_SERVER_SECURITY}" = "insecure_dev_mode" ]; then
     if [ -z "${EDGEDB_SERVER_TLS_CERT_FILE}" ] \
-       && [ -z "${EDGEDB_SERVER_TLS_KEY_FILE}" ] \
        && [ -z "${EDGEDB_SERVER_TLS_CERT_MODE}" ]
     then
       EDGEDB_SERVER_TLS_CERT_MODE="generate_self_signed"
@@ -497,19 +500,21 @@ edbdocker_setup_env() {
   fi
 
   if [ "$EDGEDB_SERVER_TLS_CERT_MODE" = "generate_self_signed" ] \
-     && [ -z "${EDGEDB_SERVER_DATADIR}" ]
+     && [ -z "$EDGEDB_SERVER_TLS_CERT_FILE" ]
   then
-    if [ -z "$EDGEDB_SERVER_TLS_CERT_FILE" ]; then
+    if [ -z "${EDGEDB_SERVER_DATADIR}" ]; then
       mkdir -p "/etc/ssl/edgedb"
       chown -R "${EDGEDB_SERVER_SERVER_UID}" "/etc/ssl/edgedb/"
       EDGEDB_SERVER_TLS_CERT_FILE="/etc/ssl/edgedb/edbtlscert.pem"
-    fi
-    if [ -z "$EDGEDB_SERVER_TLS_KEY_FILE" ]; then
-      mkdir -p "/etc/ssl/edgedb"
-      chown -R "${EDGEDB_SERVER_SERVER_UID}" "/etc/ssl/edgedb/"
       EDGEDB_SERVER_TLS_KEY_FILE="/etc/ssl/edgedb/edbprivkey.pem"
+    else
+      EDGEDB_SERVER_TLS_CERT_FILE="${EDGEDB_SERVER_DATADIR}/edbtlscert.pem"
+      EDGEDB_SERVER_TLS_KEY_FILE="${EDGEDB_SERVER_DATADIR}/edbprivkey.pem"
     fi
   fi
+
+  echo "EDGEDB_SERVER_TLS_CERT=${EDGEDB_SERVER_TLS_CERT_FILE}" >/etc/edgedb.secrets
+  echo "EDGEDB_SERVER_TLS_KEY=${EDGEDB_SERVER_TLS_KEY_FILE}" >>/etc/edgedb.secrets
 
   if [ "${EDGEDB_SERVER_DEFAULT_AUTH_METHOD}" = "default" ]; then
     EDGEDB_SERVER_DEFAULT_AUTH_METHOD="SCRAM"
