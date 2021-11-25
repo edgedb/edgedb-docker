@@ -450,18 +450,13 @@ edbdocker_setup_env() {
   fi
 
   if [ "$EDGEDB_SERVER_TLS_CERT_MODE" = "generate_self_signed" ] \
-     && [ -z "${EDGEDB_SERVER_DATADIR}" ]
+     && [ -z "${EDGEDB_SERVER_DATADIR}" ] \
+     && [ -z "$EDGEDB_SERVER_TLS_CERT_FILE" ]
   then
-    if [ -z "$EDGEDB_SERVER_TLS_CERT_FILE" ]; then
-      mkdir -p "/etc/ssl/edgedb"
-      chown -R "${EDGEDB_SERVER_SERVER_UID}" "/etc/ssl/edgedb/"
-      EDGEDB_SERVER_TLS_CERT_FILE="/etc/ssl/edgedb/edbtlscert.pem"
-    fi
-    if [ -z "$EDGEDB_SERVER_TLS_KEY_FILE" ]; then
-      mkdir -p "/etc/ssl/edgedb"
-      chown -R "${EDGEDB_SERVER_SERVER_UID}" "/etc/ssl/edgedb/"
-      EDGEDB_SERVER_TLS_KEY_FILE="/etc/ssl/edgedb/edbprivkey.pem"
-    fi
+    mkdir -p "/etc/ssl/edgedb"
+    chown -R "${EDGEDB_SERVER_SERVER_UID}" "/etc/ssl/edgedb/"
+    EDGEDB_SERVER_TLS_CERT_FILE="/etc/ssl/edgedb/edbtlscert.pem"
+    EDGEDB_SERVER_TLS_KEY_FILE="/etc/ssl/edgedb/edbprivkey.pem"
   fi
 
   if [ "${EDGEDB_SERVER_DEFAULT_AUTH_METHOD}" = "default" ]; then
