@@ -35,9 +35,9 @@ teardown() {
         | edgedb --wait-until-available=120s -P$port \
             --password-from-stdin \
             instance link --trust-tls-cert --non-interactive "${instance}"
-    run docker exec "$container_id" edgedb-show-secrets.sh --all
+    run docker exec "$container_id" edgedb-show-secrets.sh --format=toml --all
     [[ ${lines[0]} = EDGEDB_SERVER_* ]]
-    run docker exec "$container_id" edgedb-show-secrets.sh --specifically=EDGEDB_SERVER_TLS_CERT
+    run docker exec "$container_id" edgedb-show-secrets.sh --format=raw EDGEDB_SERVER_TLS_CERT
     [[ ${lines[0]} = "-----BEGIN CERTIFICATE-----" ]]
-    run docker exec "$container_id" edgedb-show-secrets.sh EDGEDB_SERVER_TLS_CERT EDGEDB_SERVER_TLS_KEY
+    run docker exec "$container_id" edgedb-show-secrets.sh --format=shell EDGEDB_SERVER_TLS_CERT EDGEDB_SERVER_TLS_KEY
 }

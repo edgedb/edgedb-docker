@@ -14,12 +14,12 @@ edb_gs_die() {
 }
 
 edb_gs_usage() {
-  edb_gs_log "Usage: $0 --all | --specifically=<SECRET_NAME> | <SECRET_NAME> [...]"
+  edb_gs_log "Usage: $0 --format=toml|shell|raw {--all | <SECRET_NAME> [...]}"
   exit "${1:-1}"
 }
 
 edb_gs_parse_args() {
-  _EDB_GS_ONLY=
+  _EDB_GS_FORMAT=
   _EDB_GS_ALL=
   _EDB_GS_SECRETS=()
 
@@ -29,19 +29,15 @@ edb_gs_parse_args() {
         edb_gs_usage 0
         ;;
       --all)
-        if [ -n "${_EDB_GS_ONLY}" ] || [ "${#_EDB_GS_SECRETS[@]}" -gt 0 ]; then
+        if [ "${#_EDB_GS_SECRETS[@]}" -gt 0 ]; then
           edb_gs_log "invalid argument combination"
           edb_gs_usage
         fi
         _EDB_GS_ALL="true"
         shift
         ;;
-      --specifically=*)
-        if [ -n "${_EDB_GS_ONLY}" ] || [ -n "${_EDB_GS_ALL}" ]; then
-          edb_gs_log "invalid argument combination"
-          edb_gs_usage
-        fi
-        _EDB_GS_ONLY="${1#*=}"
+      --format=*)
+        _EDB_GS_FORMAT="${1#*=}"
         shift
         ;;
       -*)
@@ -49,7 +45,7 @@ edb_gs_parse_args() {
         edb_gs_usage
         ;;
       *)
-        if [ -n "${_EDB_GS_ONLY}" ] || [ -n "${_EDB_GS_ALL}" ]; then
+        if [ -n "${_EDB_GS_ALL}" ]; then
           edb_gs_log "invalid argument combination"
           edb_gs_usage
         fi
@@ -59,8 +55,21 @@ edb_gs_parse_args() {
     esac
   done
 
-  if [ -z "${_EDB_GS_ONLY}" ] && [ -z "${_EDB_GS_ALL}" ] && [ "${#_EDB_GS_SECRETS[@]}" -eq 0 ]; then
+  if [ -z "${_EDB_GS_ALL}" ] && [ "${#_EDB_GS_SECRETS[@]}" -eq 0 ]; then
     edb_gs_usage
+  fi
+
+  if [ -z "${_EDB_GS_FORMAT}" ]; then
+    edb_gs_log "please specify output format with the --format= option"
+    edb_gs_usage
+  else
+    case "$_EDB_GS_FORMAT" in
+      toml|shell|raw)
+        ;;
+      *)
+        edb_gs_die "invalid --format value: ${_EDB_GS_FORMAT}, supported options are: toml, shell, raw"
+        ;;
+    esac
   fi
 }
 
@@ -75,13 +84,7 @@ edb_gs_show_secrets() (
     map["$k"]=$v
   done < "/etc/edgedb.secrets"
 
-  if [ -n "${_EDB_GS_ONLY}" ]; then
-    file=${map["$_EDB_GS_ONLY"]:-}
-    if [ -z "$file" ]; then
-      edb_gs_die "ERROR: '${_EDB_GS_ONLY}' is not a known secret"
-    fi
-    cat "$file"
-  elif [ -n "${_EDB_GS_ALL}" ]; then
+  if [ -n "${_EDB_GS_ALL}" ]; then
     for k in "${!map[@]}"; do
       file=${map["$k"]}
       edb_gs_show_secret "$k" "$file"
@@ -108,10 +111,18 @@ edb_gs_show_secret() {
 
   v=$(cat "$file")
   lines=$(wc -l "$file" | cut -f1 -d' ')
-  if [ "$lines" -gt 1 ]; then
-    printf '%s="""\n%s\n"""\n' "$name" "$v"
+  if [ "${_EDB_GS_FORMAT}" = "toml" ]; then
+    if [ "$lines" -gt 1 ]; then
+      printf '%s="""\n%s\n"""\n' "$name" "$v"
+    else
+      printf '%s="%v"\n' "$name" "$v"
+    fi
+  elif [ "${_EDB_GS_FORMAT}" = "shell" ]; then
+    printf '%s=%q\n' "$name" "$v"
+  elif [ "${_EDB_GS_FORMAT}" = "raw" ]; then
+    echo "$v"
   else
-    printf '%s="%v"\n' "$name" "$v"
+    edb_gs_die "invalid --format value: ${_EDB_GS_FORMAT}"
   fi
 }
 
