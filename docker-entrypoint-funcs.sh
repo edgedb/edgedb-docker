@@ -499,9 +499,7 @@ edbdocker_setup_env() {
     fi
   fi
 
-  if [ "$EDGEDB_SERVER_TLS_CERT_MODE" = "generate_self_signed" ] \
-     && [ -z "$EDGEDB_SERVER_TLS_CERT_FILE" ]
-  then
+  if [ -z "${EDGEDB_SERVER_TLS_CERT_FILE}" ]; then
     if [ -z "${EDGEDB_SERVER_DATADIR}" ]; then
       mkdir -p "/etc/ssl/edgedb"
       chown -R "${EDGEDB_SERVER_SERVER_UID}" "/etc/ssl/edgedb/"
