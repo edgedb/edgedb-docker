@@ -32,8 +32,8 @@ export DEBIAN_FRONTEND=noninteractive; \
 ) \
 && localedef -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8\
 && (curl https://packages.edgedb.com/keys/edgedb.asc | apt-key add -) \
-&& echo deb https://packages.edgedb.com/apt buster${subdist} main \
-        >/etc/apt/sources.list.d/edgedb${subdist}.list \
+&& echo deb https://packages.edgedb.com/apt buster ${subdist:-main} \
+        >/etc/apt/sources.list.d/edgedb.list \
 && ( \
     for i in $(seq 1 5); do [ $i -gt 1 ] && sleep 1; \
         apt-get update \
