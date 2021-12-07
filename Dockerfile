@@ -42,7 +42,7 @@ export DEBIAN_FRONTEND=noninteractive; \
 && ( \
     for i in $(seq 1 5); do [ $i -gt 1 ] && sleep 1; \
         env _EDGEDB_INSTALL_SKIP_BOOTSTRAP=1 apt-get install -y \
-            edgedb-${version} \
+            edgedb-server-${version} \
             edgedb-cli \
     && s=0 && break || s=$?; done; exit $s \
 ) \

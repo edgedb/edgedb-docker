@@ -1,11 +1,8 @@
+load testbase
+
 setup() {
-    slot=$(
-        curl https://packages.edgedb.com/apt/.jsonindexes/buster.nightly.json \
-        | jq -r '[.packages[] | select(.basename == "edgedb-server")] | sort_by(.slot) | reverse | .[0].slot')
-    docker build -t edgedb/edgedb:latest \
-        --build-arg "version=$slot" --build-arg "subdist=.nightly" \
-        .
-    cd tests/compose
+  build_container
+  cd tests/compose
 }
 
 teardown() {
