@@ -1,14 +1,10 @@
-setup() {
-    slot=$(
-        curl https://packages.edgedb.com/apt/.jsonindexes/buster.nightly.json \
-        | jq -r '[.packages[] | select(.basename == "edgedb-server")] | sort_by(.slot) | reverse | .[0].slot')
-    docker build -t edgedb/edgedb:latest \
-        --build-arg "version=$slot" --build-arg "subdist=.nightly" \
-        .
+load testbase
 
+setup() {
+  build_container
 }
 
 @test "run external command" {
-    run docker run --rm edgedb/edgedb:latest sh -c 'echo "CMD $((7*3))"'
-    [[ ${lines[-1]} = "CMD 21" ]]
+  run docker run --rm edgedb/edgedb:latest sh -c 'echo "CMD $((7*3))"'
+  [[ ${lines[-1]} = "CMD 21" ]]
 }
