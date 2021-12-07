@@ -22,7 +22,7 @@ edbdocker_setup_shell() {
 
   if [ "$EDGEDB_DOCKER_LOG_LEVEL" == "trace" ]; then
     set -x
-    export PS4='+($(basename ${BASH_SOURCE}):${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
+    export PS4='+$(date +"%Y-%m-%d %H:%M:%S"): $(basename ${BASH_SOURCE}):${LINENO}: ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
   fi
 }
 
@@ -47,9 +47,6 @@ edbdocker_run_regular_command() {
 # Parse server arguments and populate environment variables accordingly.
 # Arguments override environment variables.
 _EDGEDB_DOCKER_CMDLINE_ARGS=()
-
-# Most recent server status reported via --emit-server-info.
-EDGEDB_DOCKER_LAST_SERVER_STATUS=""
 
 # Set by a caller to edbdocker_die() to signal a specific exict code.
 EDGEDB_DOCKER_ABORT_CODE=1
@@ -319,7 +316,7 @@ edbdocker_run_server() {
   set -- edgedb-server "${server_args[@]}" ${EDGEDB_SERVER_EXTRA_ARGS:-}
 
   if [ "$(id -u)" = "0" ]; then
-    exec gosu "${EDGEDB_SERVER_SERVER_UID}" "$@"
+    exec gosu "${EDGEDB_SERVER_UID}" "$@"
   else
     exec "$@"
   fi
@@ -331,8 +328,8 @@ edbdocker_setup_env() {
   : "${EDGEDB_DOCKER_SHOW_GENERATED_CERT:=default}"
   : "${EDGEDB_DOCKER_APPLY_MIGRATIONS:=default}"
   : "${EDGEDB_SERVER_HTTP_ENDPOINT_SECURITY:=}"
-  : "${EDGEDB_SERVER_SERVER_UID:=edgedb}"
-  : "${EDGEDB_SERVER_SERVER_BINARY:=edgedb-server}"
+  : "${EDGEDB_SERVER_UID:=edgedb}"
+  : "${EDGEDB_SERVER_BINARY:=edgedb-server}"
   : "${EDGEDB_SERVER_DATADIR:=}"
   : "${EDGEDB_SERVER_BACKEND_DSN:=}"
   : "${EDGEDB_SERVER_PASSWORD:=}"
@@ -502,7 +499,7 @@ edbdocker_setup_env() {
   if [ -z "${EDGEDB_SERVER_TLS_CERT_FILE}" ]; then
     if [ -z "${EDGEDB_SERVER_DATADIR}" ]; then
       mkdir -p "/etc/ssl/edgedb"
-      chown -R "${EDGEDB_SERVER_SERVER_UID}" "/etc/ssl/edgedb/"
+      chown -R "${EDGEDB_SERVER_UID}" "/etc/ssl/edgedb/"
       EDGEDB_SERVER_TLS_CERT_FILE="/etc/ssl/edgedb/edbtlscert.pem"
       EDGEDB_SERVER_TLS_KEY_FILE="/etc/ssl/edgedb/edbprivkey.pem"
     else
@@ -628,7 +625,7 @@ edbdocker_lookup_env_var() {
       file_var_val=$(mktemp)
       echo -n "${val}" > "${file_var_val}"
       if [ "$(id -u)" = "0" ]; then
-        chown "${EDGEDB_SERVER_SERVER_UID}" "${file_var_val}"
+        chown "${EDGEDB_SERVER_UID}" "${file_var_val}"
       fi
     fi
   elif [ "${file_var_val}" ]; then
@@ -658,7 +655,7 @@ edbdocker_ensure_dirs() {
     chmod 700 "${EDGEDB_SERVER_DATADIR}" || :
 
     if [ "$(id -u)" = "0" ]; then
-      chown -R "${EDGEDB_SERVER_SERVER_UID}" "${EDGEDB_SERVER_DATADIR}"
+      chown -R "${EDGEDB_SERVER_UID}" "${EDGEDB_SERVER_DATADIR}"
     fi
   else
     unset EDGEDB_SERVER_DATADIR
@@ -668,7 +665,7 @@ edbdocker_ensure_dirs() {
   chmod 775 "${EDGEDB_SERVER_RUNSTATE_DIR}"
 
   if [ "$(id -u)" = "0" ]; then
-    chown -R "${EDGEDB_SERVER_SERVER_UID}" "${EDGEDB_SERVER_RUNSTATE_DIR}"
+    chown -R "${EDGEDB_SERVER_UID}" "${EDGEDB_SERVER_RUNSTATE_DIR}"
   fi
 }
 
@@ -798,6 +795,7 @@ edbdocker_bootstrap_instance() {
   edbdocker_run_temp_server \
     _edbdocker_bootstrap_cb \
     _edbdocker_bootstrap_abort_cb \
+    "" \
     "${bootstrap_opts[@]}"
 }
 
@@ -805,12 +803,14 @@ edbdocker_bootstrap_instance() {
 _edbdocker_bootstrap_cb() {
   local -a conn_opts
   local dir
+  local status
 
+  status="$1"
+  shift
   dir="/edgedb-bootstrap.d"
   conn_opts+=( "$@" )
 
-  _edbdocker_print_last_generated_cert_if_needed \
-    "$EDGEDB_DOCKER_LAST_SERVER_STATUS"
+  _edbdocker_print_last_generated_cert_if_needed "$status"
 
   if [ "$EDGEDB_SERVER_DATABASE" != "edgedb" ]; then
     echo "CREATE DATABASE \`${EDGEDB_SERVER_DATABASE}\`;" \
@@ -835,7 +835,7 @@ _edbdocker_bootstrap_cb() {
     done
 
     if [ "$(id -u)" = "0" ]; then
-      gosu "${EDGEDB_SERVER_SERVER_UID}" \
+      gosu "${EDGEDB_SERVER_UID}" \
         env "${envopts[@]}" /bin/run-parts --verbose "$dir" --regex='\.sh$'
     else
       env "${envopts[@]}" /bin/run-parts --verbose "$dir" --regex='\.sh$'
@@ -849,7 +849,7 @@ _edbdocker_bootstrap_cb() {
   fi
 
   if [ -d "/dbschema" ] && [ "${EDGEDB_DOCKER_APPLY_MIGRATIONS}" != "never" ]; then
-    _edbdocker_migrations_cb "${conn_opts[@]}"
+    _edbdocker_migrations_cb "" "${conn_opts[@]}"
   fi
 }
 
@@ -881,6 +881,7 @@ edbdocker_run_migrations() {
 
 
 _edbdocker_migrations_cb() {
+  shift  # Ignore the server status data in the first argument.
   if ! edbdocker_cli "${@}" migrate --schema-dir=/dbschema; then
     edbdocker_log "ERROR: Migrations failed. Stopping server."
     return 1
@@ -895,7 +896,7 @@ _edbdocker_migrations_abort_cb() {
 
 edbdocker_cli() {
   if [ "$(id -u)" = "0" ]; then
-    gosu "${EDGEDB_SERVER_SERVER_UID}" edgedb "$@"
+    gosu "${EDGEDB_SERVER_UID}" edgedb "$@"
   else
     edgedb "$@"
   fi
@@ -975,7 +976,7 @@ edbdocker_log_at_level() {
 # Check if the server supports a given command-line argument.
 edbdocker_server_supports() {
   local srv
-  srv="${EDGEDB_SERVER_SERVER_BINARY:-edgedb-server}"
+  srv="${EDGEDB_SERVER_BINARY:-edgedb-server}"
 
   if "${srv}" --help | grep -- "$1" >/dev/null; then
     return 0
@@ -988,7 +989,7 @@ edbdocker_server_supports() {
 # Start edgedb-server on a random port, execute the specified callback
 # and shut down the server.
 #
-# Usage: `edbdocker_run_temp_server callback abort_callback --server-arg=val ...`
+# Usage: `edbdocker_run_temp_server callback abort_callback status_var --server-arg=val ...`
 edbdocker_run_temp_server() {
   local edgedb_pid
   local timeout_pid
@@ -1003,16 +1004,25 @@ edbdocker_run_temp_server() {
   local status_file
   local tls_cert_file
   local status
+  local status_var
   local -a server_opts
 
   result=0
-  callback="$1"
-  abort_callback="$2"
-  shift 2
-  server_opts=( "${@}" )
+  callback="${1:-}"
+  abort_callback="${2:-}"
+  status_var="${3:-}"
+
+  if [ $# -gt 3 ]; then
+    shift 3
+    server_opts=( "${@}" )
+  fi
 
   if [ -n "${EDGEDB_SERVER_BACKEND_DSN}" ]; then
-    server_opts+=(--backend-dsn="${EDGEDB_SERVER_BACKEND_DSN}")
+    if edbdocker_server_supports "--backend-dsn"; then
+      server_opts+=(--backend-dsn="${EDGEDB_SERVER_BACKEND_DSN}")
+    else
+      server_opts+=(--postgres-dsn="${EDGEDB_SERVER_BACKEND_DSN}")
+    fi
   else
     server_opts+=(--data-dir="${EDGEDB_SERVER_DATADIR}")
   fi
@@ -1027,11 +1037,15 @@ edbdocker_run_temp_server() {
     fi
   fi
 
-  if [ -n "${EDGEDB_SERVER_TLS_CERT_FILE}" ]; then
+  if [ -n "${EDGEDB_SERVER_TLS_CERT_FILE}" ] \
+     && edbdocker_server_supports "--tls-cert-file"
+  then
     server_opts+=(--tls-cert-file="${EDGEDB_SERVER_TLS_CERT_FILE}")
   fi
 
-  if [ -n "${EDGEDB_SERVER_TLS_KEY_FILE}" ]; then
+  if [ -n "${EDGEDB_SERVER_TLS_KEY_FILE}" ] \
+     && edbdocker_server_supports "--tls-key-file"
+  then
     server_opts+=(--tls-key-file="${EDGEDB_SERVER_TLS_KEY_FILE}")
   fi
 
@@ -1047,64 +1061,71 @@ edbdocker_run_temp_server() {
 
   # Start the server
   if [ "$(id -u)" = "0" ]; then
-    gosu "${EDGEDB_SERVER_SERVER_UID}" \
-      "${EDGEDB_SERVER_SERVER_BINARY}" "${server_opts[@]}" &
+    gosu "${EDGEDB_SERVER_UID}" \
+      "${EDGEDB_SERVER_BINARY}" "${server_opts[@]}" &
   else
-    "${EDGEDB_SERVER_SERVER_BINARY}" "${server_opts[@]}" &
+    "${EDGEDB_SERVER_BINARY}" "${server_opts[@]}" &
   fi
   edgedb_pid="$!"
 
   timeout=120
 
   function _abort() {
-    if [ -e "${runstate_dir}" ]; then
-      rm -r "${runstate_dir}" || :
-    fi
     if [ -n "${abort_callback}" ]; then
-      $abort_callback "$1"
+      $abort_callback "${@}"
     fi
     result=1
   }
 
   status=$(_edbdocker_wait_for_status "$status_file" "$edgedb_pid" "$timeout")
 
-  if [ -n "$status" ]; then
-    port=$(echo "$status" | jq -r ".port")
-    tls_cert_file=$(echo "$status" | jq -r ".tls_cert_file")
+  if [ -n "$status_var" ]; then
+    local -n status_var_ref="$status_var"
+    # shellcheck disable=SC2034
+    status_var_ref="$status"
+  fi
+
+  if [ -n "$status" ] && [[ "$status" != READY=* ]]; then
+    _abort "could not start server" "$status"
+    status=""
+  elif [ -n "$status" ] && [[ $status == READY=* ]]; then
+    local srvdata="${status#READY=}"
+
+    port=$(echo "$srvdata" | jq -r ".port")
+    tls_cert_file=$(echo "$srvdata" | jq -r '.tls_cert_file // ""')
 
     conn_opts=(
       --admin
       --host="$runstate_dir"
       --port="${port}"
       --wait-until-available="2s"
-      --tls-ca-file="${tls_cert_file}"
     )
+
+    if [ -n "${tls_cert_file}" ]; then
+      conn_opts+=(
+        --tls-ca-file="${tls_cert_file}"
+      )
+    fi
 
     if ! edbdocker_cli "${conn_opts[@]}" query "SELECT 1" >/dev/null; then
       status=""
-    else
-      EDGEDB_DOCKER_LAST_SERVER_STATUS="$status"
-
-      if [ -n "${callback}" ]; then
-        if ! $callback "${conn_opts[@]}"; then
-          result=$?
-        fi
-      fi
+    elif [ -n "${callback}" ]; then
+      $callback "$status" "${conn_opts[@]}" || result=$?
     fi
   fi
 
   set +e
-  kill "$edgedb_pid" 2>/dev/null
-  sleep 10 &
+  kill -TERM "$edgedb_pid" 2>/dev/null
+  (sleep 10 ; kill -KILL "$edgedb_pid") &
   timeout_pid="$!"
-  wait -n "$edgedb_pid" "$timeout_pid"
+  wait -n "$edgedb_pid"
   ecode=$?
+  kill "$timeout_pid" 2>/dev/null
   set -e
 
-  if kill -9 "$edgedb_pid" 2>/dev/null; then
-    if [ $ecode -eq 0 ]; then
-      ecode=124
-    fi
+  if ps -o pid= -p "$edgedb_pid" >/dev/null; then
+    kill -9 "$edgedb_pid"
+    ecode=124
   fi
 
   if [ -z "$status" ] && [ $ecode -eq 0 ]; then
@@ -1119,9 +1140,11 @@ edbdocker_run_temp_server() {
     _abort "ERROR: Could not complete instance bootstrap"
   fi
 
-  result=$ecode
-
   rm -r "${runstate_dir}" || :
+
+  if [ $result -eq 0 ]; then
+    result=$ecode
+  fi
 
   return $result
 }
@@ -1132,7 +1155,7 @@ edbdocker_mktemp_for_server() {
   result=$(mktemp "$@")
 
   if [ "$(id -u)" = "0" ]; then
-    chown -R "${EDGEDB_SERVER_SERVER_UID}" "${result}"
+    chown -R "${EDGEDB_SERVER_UID}" "${result}"
   fi
 
   echo "${result}"
@@ -1158,10 +1181,8 @@ _edbdocker_wait_for_status() {
   fi
 
   while IFS= read -r line; do
-    if [[ $line == READY=* ]]; then
-      status="${line#READY=}"
-      break
-    fi
+    status="${line}"
+    break
   done < <(timeout "$timeout" tail "${tail_args[@]}")
 
   rm -rf "$status_file" || :
@@ -1177,7 +1198,11 @@ _edbdocker_print_last_generated_cert_if_needed() {
   local status
   local msg
 
-  status="$1"
+  if [[ $1 != READY=* ]]; then
+    return
+  fi
+
+  status="${1#READY=}"
 
   tls_cert_new=$(echo "$status" | jq -r ".tls_cert_newly_generated")
 
