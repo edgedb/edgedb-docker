@@ -82,7 +82,7 @@ edb_gs_show_secrets() (
 
   while IFS="=" read -r k v; do
     map["$k"]=$v
-  done < "/etc/edgedb.secrets"
+  done < "/tmp/edgedb/secrets"
 
   if [ -n "${_EDB_GS_ALL}" ]; then
     for k in "${!map[@]}"; do

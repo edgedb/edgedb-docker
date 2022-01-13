@@ -343,7 +343,22 @@ edbdocker_setup_env() {
   : "${EDGEDB_SERVER_TLS_KEY_FILE:=}"
   : "${EDGEDB_SERVER_BOOTSTRAP_SCRIPT_FILE:=}"
   : "${EDGEDB_SERVER_BOOTSTRAP_COMMAND:=}"
-  : "${EDGEDB_SERVER_RUNSTATE_DIR:=/run/edgedb}"
+
+  if [ -z "${EDGEDB_SERVER_UID:-}" ]; then
+    if [ "$(id -u)" = "0" ]; then
+      EDGEDB_SERVER_UID="edgedb"
+    else
+      EDGEDB_SERVER_UID="$(id -un)"
+    fi
+  fi
+
+  if [ -z "${EDGEDB_SERVER_RUNSTATE_DIR:-}" ]; then
+    if [ "$(id -u)" = "0" ]; then
+      EDGEDB_SERVER_RUNSTATE_DIR="/run/edgedb"
+    else
+      EDGEDB_SERVER_RUNSTATE_DIR="/tmp/edgedb"
+    fi
+  fi
 
   if [ "${EDGEDB_DOCKER_SHOW_GENERATED_CERT}" = "default" ]; then
     EDGEDB_DOCKER_SHOW_GENERATED_CERT="always"
@@ -496,20 +511,23 @@ edbdocker_setup_env() {
     fi
   fi
 
+  mkdir -p /tmp/edgedb
+  if [ "$(id -u)" = "0" ]; then
+    chown "${EDGEDB_SERVER_UID}" "/tmp/edgedb"
+  fi
+
   if [ -z "${EDGEDB_SERVER_TLS_CERT_FILE}" ]; then
     if [ -z "${EDGEDB_SERVER_DATADIR}" ]; then
-      mkdir -p "/etc/ssl/edgedb"
-      chown -R "${EDGEDB_SERVER_UID}" "/etc/ssl/edgedb/"
-      EDGEDB_SERVER_TLS_CERT_FILE="/etc/ssl/edgedb/edbtlscert.pem"
-      EDGEDB_SERVER_TLS_KEY_FILE="/etc/ssl/edgedb/edbprivkey.pem"
+      EDGEDB_SERVER_TLS_CERT_FILE="/tmp/edgedb/edbtlscert.pem"
+      EDGEDB_SERVER_TLS_KEY_FILE="/tmp/edgedb/edbprivkey.pem"
     else
       EDGEDB_SERVER_TLS_CERT_FILE="${EDGEDB_SERVER_DATADIR}/edbtlscert.pem"
       EDGEDB_SERVER_TLS_KEY_FILE="${EDGEDB_SERVER_DATADIR}/edbprivkey.pem"
     fi
   fi
 
-  echo "EDGEDB_SERVER_TLS_CERT=${EDGEDB_SERVER_TLS_CERT_FILE}" >/etc/edgedb.secrets
-  echo "EDGEDB_SERVER_TLS_KEY=${EDGEDB_SERVER_TLS_KEY_FILE}" >>/etc/edgedb.secrets
+  echo "EDGEDB_SERVER_TLS_CERT=${EDGEDB_SERVER_TLS_CERT_FILE}" >/tmp/edgedb/secrets
+  echo "EDGEDB_SERVER_TLS_KEY=${EDGEDB_SERVER_TLS_KEY_FILE}" >>/tmp/edgedb/secrets
 
   if [ "${EDGEDB_SERVER_DEFAULT_AUTH_METHOD}" = "default" ]; then
     EDGEDB_SERVER_DEFAULT_AUTH_METHOD="SCRAM"
@@ -855,8 +873,11 @@ _edbdocker_bootstrap_cb() {
 
 
 _edbdocker_bootstrap_abort_cb() {
-  if [ -n "${EDGEDB_SERVER_DATADIR}" ] && [ -e "${EDGEDB_SERVER_DATADIR}" ]; then
-    (shopt -u nullglob; rm -rf "${EDGEDB_SERVER_DATADIR:?}/"* || :)
+  local datadir
+  datadir="${EDGEDB_SERVER_DATADIR:-}"
+
+  if [ -n "$datadir" ] && [ -e "$datadir" ]; then
+    (shopt -u nullglob; rm -rf "${datadir:?}/"* || :)
   fi
 
   edbdocker_die "$1"
