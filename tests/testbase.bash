@@ -135,6 +135,9 @@ create_instance() {
   docker run -d --name="${_container}" "${docker_args[@]}" \
     "$image" "${image_args[@]}"
 
+  echo docker run -d --name="${_container}" "${docker_args[@]}" \
+    "$image" "${image_args[@]}"
+
   port=$(docker inspect "${_container}" \
     | jq -r '.[0].NetworkSettings.Ports["5656/tcp"][0].HostPort')
 
