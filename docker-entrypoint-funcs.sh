@@ -818,22 +818,13 @@ edbdocker_bootstrap_instance() {
 }
 
 
-_edbdocker_bootstrap_cb() {
-  local -a conn_opts
+_edbdocker_bootstrap_run_hooks() {
   local dir
-  local status
+  local -a conn_opts
 
-  status="$1"
+  dir="$1"
   shift
-  dir="/edgedb-bootstrap.d"
   conn_opts+=( "$@" )
-
-  _edbdocker_print_last_generated_cert_if_needed "$status"
-
-  if [ "$EDGEDB_SERVER_DATABASE" != "edgedb" ]; then
-    echo "CREATE DATABASE \`${EDGEDB_SERVER_DATABASE}\`;" \
-      | edbdocker_cli "${conn_opts[@]}" --database="edgedb"
-  fi
 
   if [ -d "${dir}" ]; then
     local envopts=()
@@ -865,10 +856,34 @@ _edbdocker_bootstrap_cb() {
       edbdocker_cli "${conn_opts[@]}" <"$filename"
     done
   fi
+}
+
+
+_edbdocker_bootstrap_cb() {
+  local -a conn_opts
+  local dir
+  local status
+
+  status="$1"
+  shift
+  conn_opts+=( "$@" )
+
+  _edbdocker_print_last_generated_cert_if_needed "$status"
+
+  if [ "$EDGEDB_SERVER_DATABASE" != "edgedb" ]; then
+    echo "CREATE DATABASE \`${EDGEDB_SERVER_DATABASE}\`;" \
+      | edbdocker_cli "${conn_opts[@]}" --database="edgedb"
+  fi
+
+  _edbdocker_bootstrap_run_hooks "/edgedb-bootstrap.d" "${conn_opts[@]}"
 
   if [ -d "/dbschema" ] && [ "${EDGEDB_DOCKER_APPLY_MIGRATIONS}" != "never" ]; then
-    _edbdocker_migrations_cb "" "${conn_opts[@]}"
+    if ! _edbdocker_migrations_cb "" "${conn_opts[@]}"; then
+      return 1
+    fi
   fi
+
+  _edbdocker_bootstrap_run_hooks "/edgedb-bootstrap-late.d" "${conn_opts[@]}"
 }
 
 
