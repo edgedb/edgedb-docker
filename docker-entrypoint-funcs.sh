@@ -475,7 +475,7 @@ edbdocker_setup_env() {
   fi
 
   if [ -n "${EDGEDB_SERVER_PASSWORD}" ] && [ -n "${EDGEDB_SERVER_PASSWORD_HASH}" ]; then
-    edbdocker_die "ERROR: EDGEDB_SERVER_PASSWORD and EDGEDB_SERVER_PASSWORD_PASH are mutually exclusive, but both are set"
+    edbdocker_die "ERROR: EDGEDB_SERVER_PASSWORD and EDGEDB_SERVER_PASSWORD_HASH are mutually exclusive, but both are set"
   fi
 
   if [ -n "${EDGEDB_SERVER_BOOTSTRAP_SCRIPT_FILE}" ] && [ -n "${EDGEDB_SERVER_BOOTSTRAP_COMMAND}" ]; then
