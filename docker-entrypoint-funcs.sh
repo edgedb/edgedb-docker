@@ -305,6 +305,10 @@ edbdocker_run_server() {
     server_args+=(--http-endpoint-security="${EDGEDB_SERVER_HTTP_ENDPOINT_SECURITY}")
   fi
 
+  if [ -n "${EDGEDB_SERVER_COMPILER_POOL_MODE}" ]; then
+    server_args+=(--compiler-pool-mode="${EDGEDB_SERVER_COMPILER_POOL_MODE}")
+  fi
+
   server_args+=( "${_EDGEDB_DOCKER_CMDLINE_ARGS[@]}" )
 
   status_file="$(edbdocker_mktemp_for_server)"
@@ -343,6 +347,7 @@ edbdocker_setup_env() {
   : "${EDGEDB_SERVER_TLS_KEY_FILE:=}"
   : "${EDGEDB_SERVER_BOOTSTRAP_SCRIPT_FILE:=}"
   : "${EDGEDB_SERVER_BOOTSTRAP_COMMAND:=}"
+  : "${EDGEDB_SERVER_COMPILER_POOL_MODE:=}"
 
   if [ -z "${EDGEDB_SERVER_UID:-}" ]; then
     if [ "$(id -u)" = "0" ]; then
@@ -459,6 +464,7 @@ edbdocker_setup_env() {
   edbdocker_lookup_env_var "EDGEDB_SERVER_TLS_CERT" "" true
   edbdocker_lookup_env_var "EDGEDB_SERVER_TLS_CERT_MODE"
   edbdocker_lookup_env_var "EDGEDB_SERVER_BOOTSTRAP_COMMAND"
+  edbdocker_lookup_env_var "EDGEDB_SERVER_COMPILER_POOL_MODE"
 
   if [ -n "${EDGEDB_SERVER_TLS_KEY_FILE}" ] && [ -z "${EDGEDB_SERVER_TLS_CERT_FILE}" ]; then
     edbdocker_die "ERROR: EDGEDB_SERVER_TLS_CERT_FILE must be set when EDGEDB_SERVER_TLS_KEY_FILE is set"
@@ -1083,6 +1089,10 @@ edbdocker_run_temp_server() {
      && edbdocker_server_supports "--tls-key-file"
   then
     server_opts+=(--tls-key-file="${EDGEDB_SERVER_TLS_KEY_FILE}")
+  fi
+
+  if edbdocker_server_supports "--compiler-pool-mode"; then
+    server_opts+=(--compiler-pool-mode="on_demand")
   fi
 
   runstate_dir="$(edbdocker_mktemp_for_server -d)"
