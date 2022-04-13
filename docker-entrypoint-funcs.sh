@@ -826,40 +826,46 @@ edbdocker_bootstrap_instance() {
 
 _edbdocker_bootstrap_run_hooks() {
   local dir
-  local -a conn_opts
+  local -a opts
+  local -a env
 
   dir="$1"
   shift
-  conn_opts+=( "$@" )
 
   if [ -d "${dir}" ]; then
-    local envopts=()
     local opt
+    local seen_dashdash
 
-    for opt in "${conn_opts[@]}"; do
-      case "$opt" in
-        --port=*)
-          envopts+=( "EDGEDB_PORT=${opt#*=}" )
-          ;;
-        --host=*)
-          envopts+=( "EDGEDB_HOST=${opt#*=}" )
-          ;;
-        *)
-          ;;
-      esac
+    seen_dashdash=""
+
+    for opt in "$@"; do
+      if [ -z "$seen_dashdash" ]; then
+        if [ "$opt" = "--" ]; then
+          seen_dashdash="1"
+        else
+          env+=( "$opt" )
+        fi
+      else
+        opts+=( "$opt" )
+      fi
     done
 
     if [ "$(id -u)" = "0" ]; then
       gosu "${EDGEDB_SERVER_UID}" \
-        env "${envopts[@]}" /bin/run-parts --verbose "$dir" --regex='\.sh$'
+        env "${env[@]}" /bin/run-parts --verbose "$dir" --regex='\.sh$'
     else
-      env "${envopts[@]}" /bin/run-parts --verbose "$dir" --regex='\.sh$'
+      env "${env[@]}" /bin/run-parts --verbose "$dir" --regex='\.sh$'
     fi
 
     # Feeding scripts one by one, so that errors are easier to debug
     for filename in $(/bin/run-parts --list "$dir" --regex='\.edgeql$'); do
       edbdocker_log_at_level "info" "Bootstrap script $filename"
-      edbdocker_cli "${conn_opts[@]}" <"$filename"
+      if [ "$(id -u)" = "0" ]; then
+        gosu "${EDGEDB_SERVER_UID}" \
+          env "${env[@]}" edgedb "${opts[@]}" <"$filename"
+      else
+        env "${env[@]}" edgedb "${opts[@]}" <"$filename"
+      fi
     done
   fi
 }
@@ -878,7 +884,7 @@ _edbdocker_bootstrap_cb() {
 
   if [ "$EDGEDB_SERVER_DATABASE" != "edgedb" ]; then
     echo "CREATE DATABASE \`${EDGEDB_SERVER_DATABASE}\`;" \
-      | edbdocker_cli "${conn_opts[@]}" --database="edgedb"
+      | edbdocker_cli "${conn_opts[@]}" -- --database="edgedb"
   fi
 
   _edbdocker_bootstrap_run_hooks "/edgedb-bootstrap.d" "${conn_opts[@]}"
@@ -924,7 +930,7 @@ edbdocker_run_migrations() {
 
 _edbdocker_migrations_cb() {
   shift  # Ignore the server status data in the first argument.
-  if ! edbdocker_cli "${@}" migrate --schema-dir=/dbschema; then
+  if ! edbdocker_cli "${@}" -- migrate --schema-dir=/dbschema; then
     edbdocker_log "ERROR: Migrations failed. Stopping server."
     return 1
   fi
@@ -937,10 +943,29 @@ _edbdocker_migrations_abort_cb() {
 
 
 edbdocker_cli() {
+  local -a opts
+  local -a env
+  local opt
+  local seen_dashdash
+
+  seen_dashdash=""
+
+  for opt in "$@"; do
+    if [ -z "$seen_dashdash" ]; then
+      if [ "$opt" = "--" ]; then
+        seen_dashdash="1"
+      else
+        env+=( "$opt" )
+      fi
+    else
+      opts+=( "$opt" )
+    fi
+  done
+
   if [ "$(id -u)" = "0" ]; then
-    gosu "${EDGEDB_SERVER_UID}" edgedb "$@"
+    gosu "${EDGEDB_SERVER_UID}" env "${env[@]}" edgedb "${opts[@]}"
   else
-    edgedb "$@"
+    env "${env[@]}" edgedb "${opts[@]}"
   fi
 }
 
@@ -1039,7 +1064,7 @@ edbdocker_run_temp_server() {
   local runstate_dir
   local port
   local ecode
-  local conn_opts
+  local -a conn_opts
   local callback
   local abort_callback
   local result
@@ -1099,6 +1124,7 @@ edbdocker_run_temp_server() {
   status_file="$(edbdocker_mktemp_for_server)"
 
   server_opts+=(
+    --default-auth-method="Trust"
     --runstate-dir="$runstate_dir"
     --port="auto"
     --bind-address="127.0.0.1"
@@ -1141,19 +1167,30 @@ edbdocker_run_temp_server() {
     tls_cert_file=$(echo "$srvdata" | jq -r '.tls_cert_file // ""')
 
     conn_opts=(
-      --admin
-      --host="$runstate_dir"
-      --port="${port}"
-      --wait-until-available="2s"
+      EDGEDB_HOST="127.0.0.1"
+      EDGEDB_PORT="${port}"
+      EDGEDB_CLIENT_TLS_SECURITY="insecure"
     )
 
     if [ -n "${tls_cert_file}" ]; then
       conn_opts+=(
-        --tls-ca-file="${tls_cert_file}"
+        EDGEDB_TLS_CA_FILE="${tls_cert_file}"
       )
     fi
 
-    if ! edbdocker_cli "${conn_opts[@]}" query "SELECT 1" >/dev/null; then
+    if [ -n "${EDGEDB_SERVER_USER}" ]; then
+      conn_opts+=(
+        EDGEDB_USER="${EDGEDB_SERVER_USER}"
+      )
+    fi
+
+    if [ -n "${EDGEDB_SERVER_PASSWORD}" ]; then
+      conn_opts+=(
+        EDGEDB_PASSWORD="${EDGEDB_SERVER_PASSWORD}"
+      )
+    fi
+
+    if ! edbdocker_cli "${conn_opts[@]}" -- query "SELECT 1" >/dev/null; then
       status=""
     elif [ -n "${callback}" ]; then
       $callback "$status" "${conn_opts[@]}" || result=$?

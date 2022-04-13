@@ -1,2 +1,2 @@
 #!/usr/bin/env bash
-edgedb --admin query "INSERT Bootstrap { name := '01-shell script' }"
+edgedb query "INSERT Bootstrap { name := '01-shell script' }"
