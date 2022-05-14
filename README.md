@@ -1,6 +1,7 @@
 # The official Docker image for EdgeDB
 
-This repository contains the officially maintained Docker image packaging EdgeDB and the EdgeDB CLI.
+This repository contains the officially maintained Docker image packaging
+EdgeDB and the EdgeDB CLI.
 
 #### ✨[Documentation](https://www.edgedb.com/docs/guides/deployment/docker)✨
 
@@ -8,9 +9,8 @@ This repository contains the officially maintained Docker image packaging EdgeDB
 
 This image is intended for use in production, or as part of a
 development setup that involves multiple containers orchestrated by
-Docker Compose or a similar tool. Otherwise, using the `edgedb server`
-CLI on the host system is the recommended way to install and run
-EdgeDB servers.
+Docker Compose or a similar tool. Otherwise, we recommend using the [`edgedb CLI`](https://www.edgedb.com/docs/guides/quickstart) to install EdgeDB and
+manage local instances.
 
 ## What is EdgeDB?
 
