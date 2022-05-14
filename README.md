@@ -2,7 +2,7 @@
 
 The official Docker image for EdgeDB and the EdgeDB CLI.
 
-### [Documentation](https://www.edgedb.com/docs/guides/deployment/docker)
+#### ✨[Documentation](https://www.edgedb.com/docs/guides/deployment/docker)✨
 
 ## When to use this image
 
