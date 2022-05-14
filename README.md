@@ -1,6 +1,6 @@
-# Official Dockerfile for EdgeDB Server
+# The official Docker image for EdgeDB
 
-The official Docker image for EdgeDB and the EdgeDB CLI.
+This repository contains the officially maintained Docker image packaging EdgeDB and the EdgeDB CLI.
 
 #### ✨[Documentation](https://www.edgedb.com/docs/guides/deployment/docker)✨
 
