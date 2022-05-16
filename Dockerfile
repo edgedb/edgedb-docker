@@ -31,19 +31,19 @@ export DEBIAN_FRONTEND=noninteractive; \
     && s=0 && break || s=$?; done; exit $s \
 ) \
 && localedef -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8\
-&& (curl https://packages.edgedb.com/keys/edgedb.asc | apt-key add -) \
+&& curl -fsSL https://packages.edgedb.com/keys/edgedb.asc \
+       -o /etc/apt/trusted.gpg.d/edgedb.asc \
 && echo deb https://packages.edgedb.com/apt buster ${subdist:-main} \
-        >/etc/apt/sources.list.d/edgedb.list \
+       >/etc/apt/sources.list.d/edgedb.list \
 && ( \
     for i in $(seq 1 5); do [ $i -gt 1 ] && sleep 1; \
         apt-get update \
     && s=0 && break || s=$?; done; exit $s \
 ) \
 && ( \
+    server=edgedb-server-${version}; \
     for i in $(seq 1 5); do [ $i -gt 1 ] && sleep 1; \
-        env _EDGEDB_INSTALL_SKIP_BOOTSTRAP=1 apt-get install -y \
-            edgedb-server-${version} \
-            edgedb-cli \
+        env apt-get install -y ${server} edgedb-cli \
     && s=0 && break || s=$?; done; exit $s \
 ) \
 && ln -s /usr/bin/edgedb-server-${version} /usr/bin/edgedb-server \
