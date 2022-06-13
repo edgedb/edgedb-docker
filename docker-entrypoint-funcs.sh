@@ -766,7 +766,7 @@ edbdocker_bootstrap_instance() {
       fi
     elif [ "${EDGEDB_SERVER_DEFAULT_AUTH_METHOD}" = "Trust" ] ; then
       if ! edbdocker_server_supports "--default-auth-method"; then
-        bootstrap_cmd="CONFIGURE SYSTEM INSERT Auth {priority := 0, method := (INSERT Trust)};"
+        bootstrap_cmd="CONFIGURE INSTANCE INSERT Auth {priority := 0, method := (INSERT Trust)};"
       fi
       msg=(
         "================================================================"
