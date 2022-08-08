@@ -1,5 +1,6 @@
 FROM debian:buster-slim
 ARG version
+ARG exact_version
 ARG subdist
 
 ENV GOSU_VERSION 1.11
@@ -42,8 +43,9 @@ export DEBIAN_FRONTEND=noninteractive; \
 ) \
 && ( \
     server=edgedb-server-${version}; \
+    [ -n "${exact_version}" ] && server+="=${exact_version}+*"; \
     for i in $(seq 1 5); do [ $i -gt 1 ] && sleep 1; \
-        env apt-get install -y ${server} edgedb-cli \
+        env apt-get install -y "${server}" edgedb-cli \
     && s=0 && break || s=$?; done; exit $s \
 ) \
 && ln -s /usr/bin/edgedb-server-${version} /usr/bin/edgedb-server \
