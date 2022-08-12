@@ -179,6 +179,14 @@ edbdocker_parse_args() {
         EDGEDB_SERVER_EMIT_SERVER_STATUS="${1#*=}"
         shift
         ;;
+      --admin-ui)
+        _edbdocker_parse_arg "EDGEDB_SERVER_ADMIN_UI" "$1" "$2"
+        shift 2
+        ;;
+      --admin-ui=*)
+        EDGEDB_SERVER_ADMIN_UI="${1#*=}"
+        shift
+        ;;
       *)
         _EDGEDB_DOCKER_CMDLINE_ARGS+=( "$1" )
         shift
@@ -292,7 +300,11 @@ edbdocker_run_server() {
   fi
 
   if [ -n "${EDGEDB_SERVER_EMIT_SERVER_STATUS}" ]; then
-      server_args+=(--emit-server-status="${EDGEDB_SERVER_EMIT_SERVER_STATUS}")
+    server_args+=(--emit-server-status="${EDGEDB_SERVER_EMIT_SERVER_STATUS}")
+  fi
+
+  if [ -n "${EDGEDB_SERVER_ADMIN_UI}" ]; then
+    server_args+=(--admin-ui="${EDGEDB_SERVER_ADMIN_UI}")
   fi
 
   if [ -n "${EDGEDB_SERVER_DEFAULT_AUTH_METHOD}" ] \
@@ -344,6 +356,7 @@ edbdocker_setup_env() {
   : "${EDGEDB_SERVER_PASSWORD_HASH:=}"
   : "${EDGEDB_SERVER_SECURITY:=}"
   : "${EDGEDB_SERVER_EMIT_SERVER_STATUS:=}"
+  : "${EDGEDB_SERVER_ADMIN_UI:=}"
   : "${EDGEDB_SERVER_BOOTSTRAP_ONLY:=}"
   : "${EDGEDB_SERVER_DEFAULT_AUTH_METHOD:=}"
   : "${EDGEDB_SERVER_TLS_CERT_MODE:=}"
