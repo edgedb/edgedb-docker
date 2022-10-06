@@ -347,6 +347,7 @@ edbdocker_run_server() {
 edbdocker_setup_env() {
   : "${EDGEDB_DOCKER_SHOW_GENERATED_CERT:=default}"
   : "${EDGEDB_DOCKER_APPLY_MIGRATIONS:=default}"
+  : "${EDGEDB_DOCKER_BOOTSTRAP_TIMEOUT_SEC:=300}"
   : "${EDGEDB_SERVER_HTTP_ENDPOINT_SECURITY:=}"
   : "${EDGEDB_SERVER_UID:=edgedb}"
   : "${EDGEDB_SERVER_BINARY:=edgedb-server}"
@@ -1083,6 +1084,7 @@ edbdocker_run_temp_server() {
   local runstate_dir
   local port
   local ecode
+  local emsg
   local -a conn_opts
   local callback
   local abort_callback
@@ -1097,6 +1099,7 @@ edbdocker_run_temp_server() {
   callback="${1:-}"
   abort_callback="${2:-}"
   status_var="${3:-}"
+  emsg="ERROR: Could not complete instance bootstrap"
 
   if [ $# -gt 3 ]; then
     shift 3
@@ -1159,7 +1162,7 @@ edbdocker_run_temp_server() {
   fi
   edgedb_pid="$!"
 
-  timeout=120
+  timeout="$EDGEDB_DOCKER_BOOTSTRAP_TIMEOUT_SEC"
 
   function _abort() {
     if [ -n "${abort_callback}" ]; then
@@ -1230,16 +1233,19 @@ edbdocker_run_temp_server() {
     ecode=124
   fi
 
-  if [ -z "$status" ] && [ $ecode -eq 0 ]; then
+  if [ $ecode -eq 0 ] || [ $ecode -eq 143 ] && [ -z "$status" ]; then
     # This means server did not produce the READY status in $timeout seconds.
     ecode=1
+    emsg="ERROR: Could not complete instance bootstrap in ${timeout} seconds."
+    emsg+=" If you have slow hardware, consider increasing the timeout"
+    emsg+=" via the EDGEDB_DOCKER_BOOTSTRAP_TIMEOUT_SEC variable."
   fi
 
   if [ $ecode -ne 0 ]; then
     if [ $ecode -eq 10 ]; then
       edbdocker_log_no_tls_cert
     fi
-    _abort "ERROR: Could not complete instance bootstrap"
+    _abort "$emsg"
   fi
 
   rm -r "${runstate_dir}" || :
