@@ -49,7 +49,7 @@ export DEBIAN_FRONTEND=noninteractive; \
     && s=0 && break || s=$?; done; exit $s \
 ) \
 && ln -s /usr/bin/edgedb-server-${version} /usr/bin/edgedb-server \
-&& apt-get remove -y apt-utils gnupg dirmngr wget curl apt-transport-https \
+&& apt-get remove -y apt-utils gnupg dirmngr wget apt-transport-https \
 && apt-get purge -y --auto-remove \
 && rm -rf /var/lib/apt/lists/*
 
