@@ -1212,7 +1212,7 @@ edbdocker_run_temp_server() {
       )
     fi
 
-    if ! edbdocker_cli "${conn_opts[@]}" -- query "SELECT 1" >/dev/null; then
+    if ! curl -sf "http://127.0.0.1:${port}/server/status/alive" >/dev/null; then
       status=""
     elif [ -n "${callback}" ]; then
       $callback "$status" "${conn_opts[@]}" || result=$?
