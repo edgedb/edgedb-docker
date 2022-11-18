@@ -123,6 +123,14 @@ edbdocker_parse_args() {
         EDGEDB_SERVER_BOOTSTRAP_SCRIPT_FILE="${1#*=}"
         shift
         ;;
+      --bootstrap-command-file)
+        _edbdocker_parse_arg "EDGEDB_SERVER_BOOTSTRAP_COMMAND_FILE" "$1" "$2"
+        shift 2
+        ;;
+      --bootstrap-command-file=*)
+        EDGEDB_SERVER_BOOTSTRAP_COMMAND_FILE="${1#*=}"
+        shift
+        ;;
       --bootstrap-only)
         EDGEDB_SERVER_BOOTSTRAP_ONLY="1"
         shift
@@ -363,10 +371,24 @@ edbdocker_setup_env() {
   : "${EDGEDB_SERVER_TLS_CERT_MODE:=}"
   : "${EDGEDB_SERVER_TLS_CERT_FILE:=}"
   : "${EDGEDB_SERVER_TLS_KEY_FILE:=}"
-  : "${EDGEDB_SERVER_BOOTSTRAP_SCRIPT_FILE:=}"
   : "${EDGEDB_SERVER_BOOTSTRAP_COMMAND:=}"
   : "${EDGEDB_SERVER_COMPILER_POOL_MODE:=}"
   : "${EDGEDB_SERVER_COMPILER_POOL_SIZE:=}"
+
+  if [ -n "${EDGEDB_SERVER_BOOTSTRAP_SCRIPT_FILE:-}" ]; then
+    if [ -n "${EDGEDB_SERVER_BOOTSTRAP_COMMAND_FILE}" ]; then
+      edbdocker_die "ERROR: EDGEDB_SERVER_BOOTSTRAP_COMMAND_FILE and EDGEDB_SERVER_BOOTSTRAP_SCRIPT_FILE are mutually exclusive, but both are set"
+    else
+      msg=(
+        "============================================================"
+        "WARNING: EDGEDB_SERVER_BOOTSTRAP_SCRIPT_FILE is deprecated. "
+        "         Use EDGEDB_SERVER_BOOTSTRAP_COMMAND_FILE instead."
+        "============================================================"
+      )
+      edbdocker_log_at_level "warning" "${msg[@]}"
+      EDGEDB_SERVER_BOOTSTRAP_COMMAND_FILE="${EDGEDB_SERVER_BOOTSTRAP_SCRIPT_FILE}"
+    fi
+  fi
 
   if [ -z "${EDGEDB_SERVER_UID:-}" ]; then
     if [ "$(id -u)" = "0" ]; then
@@ -502,10 +524,6 @@ edbdocker_setup_env() {
 
   if [ -n "${EDGEDB_SERVER_PASSWORD}" ] && [ -n "${EDGEDB_SERVER_PASSWORD_HASH}" ]; then
     edbdocker_die "ERROR: EDGEDB_SERVER_PASSWORD and EDGEDB_SERVER_PASSWORD_HASH are mutually exclusive, but both are set"
-  fi
-
-  if [ -n "${EDGEDB_SERVER_BOOTSTRAP_SCRIPT_FILE}" ] && [ -n "${EDGEDB_SERVER_BOOTSTRAP_COMMAND}" ]; then
-    edbdocker_die "ERROR: EDGEDB_SERVER_BOOTSTRAP_SCRIPT_FILE and EDGEDB_SERVER_BOOTSTRAP_COMMAND are mutually exclusive, but both are set"
   fi
 
   if [ -n "${EDGEDB_SERVER_ALLOW_INSECURE_HTTP_CLIENTS:-}" ]; then
@@ -752,18 +770,15 @@ edbdocker_bootstrap_instance() {
   bootstrap_cmd=""
   bootstrap_opts=( "$@" )
 
-  if [ -n "${EDGEDB_SERVER_BOOTSTRAP_SCRIPT_FILE}" ]; then
-    if ! [ -e "${EDGEDB_SERVER_BOOTSTRAP_SCRIPT_FILE}" ]; then
-      edbdocker_die "ERROR: the file specified by EDGEDB_SERVER_BOOTSTRAP_SCRIPT_FILE (${EDGEDB_SERVER_BOOTSTRAP_SCRIPT_FILE}) does not exist."
-    else
-      bootstrap_opts+=(--bootstrap-script="${EDGEDB_SERVER_BOOTSTRAP_SCRIPT_FILE}")
-    fi
-
-  elif [ -n "${EDGEDB_SERVER_BOOTSTRAP_COMMAND}" ]; then
+  if [ -n "${EDGEDB_SERVER_BOOTSTRAP_COMMAND}" ]; then
     bootstrap_opts+=(--bootstrap-command="${EDGEDB_SERVER_BOOTSTRAP_COMMAND}")
 
   elif [ -e "/edgedb-bootstrap.edgeql" ]; then
-    bootstrap_opts+=(--bootstrap-script="/edgedb-bootstrap.edgeql")
+    if edbdocker_server_supports "--bootstrap-command-file"; then
+        bootstrap_opts+=(--bootstrap-command-file="/edgedb-bootstrap.edgeql")
+    else
+        bootstrap_opts+=(--bootstrap-script="/edgedb-bootstrap.edgeql")
+    fi
 
   else
     if [ -n "${EDGEDB_SERVER_PASSWORD_HASH}" ]; then
