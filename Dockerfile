@@ -32,10 +32,12 @@ export DEBIAN_FRONTEND=noninteractive; \
     && s=0 && break || s=$?; done; exit $s \
 ) \
 && localedef -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8\
-&& curl -fsSL https://packages.edgedb.com/keys/edgedb.asc \
-       -o /etc/apt/trusted.gpg.d/edgedb.asc \
-&& echo deb https://packages.edgedb.com/apt buster ${subdist:-main} \
-       >/etc/apt/sources.list.d/edgedb.list \
+&& mkdir -p /usr/local/share/keyrings \
+&& curl --proto '=https' --tlsv1.2 -sSf \
+    -o /usr/local/share/keyrings/edgedb-keyring.gpg \
+    https://packages.edgedb.com/keys/edgedb-keyring.gpg \
+&& echo "deb [signed-by=/usr/local/share/keyrings/edgedb-keyring.gpg] https://packages.edgedb.com/apt buster ${subdist:-main}" \
+    > "/etc/apt/sources.list.d/edgedb.list" \
 && ( \
     for i in $(seq 1 5); do [ $i -gt 1 ] && sleep 1; \
         apt-get update \
