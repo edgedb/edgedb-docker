@@ -526,6 +526,10 @@ edbdocker_setup_env() {
     edbdocker_die "ERROR: EDGEDB_SERVER_PASSWORD and EDGEDB_SERVER_PASSWORD_HASH are mutually exclusive, but both are set"
   fi
 
+  if [ -n "${EDGEDB_SERVER_BOOTSTRAP_SCRIPT_FILE}" ] && [ -n "${EDGEDB_SERVER_BOOTSTRAP_COMMAND}" ]; then
+    edbdocker_die "ERROR: EDGEDB_SERVER_BOOTSTRAP_SCRIPT_FILE and EDGEDB_SERVER_BOOTSTRAP_COMMAND are mutually exclusive, but both are set"
+  fi
+
   if [ -n "${EDGEDB_SERVER_ALLOW_INSECURE_HTTP_CLIENTS:-}" ]; then
     if [ -z "${EDGEDB_SERVER_HTTP_ENDPOINT_SECURITY}" ]; then
       EDGEDB_SERVER_HTTP_ENDPOINT_SECURITY="optional"
