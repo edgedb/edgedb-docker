@@ -410,7 +410,7 @@ edbdocker_setup_env() {
   if [ "${EDGEDB_DOCKER_SHOW_GENERATED_CERT}" = "default" ]; then
     EDGEDB_DOCKER_SHOW_GENERATED_CERT="always"
   elif [ "${EDGEDB_DOCKER_SHOW_GENERATED_CERT}" = "always" ] \
-       || [ "${EDGEDB_DOCKER_SHOW_GENERATED_CERT}" = "always" ]
+       || [ "${EDGEDB_DOCKER_SHOW_GENERATED_CERT}" = "never" ]
   then
     :
   else
@@ -437,7 +437,7 @@ edbdocker_setup_env() {
   if [ "${EDGEDB_DOCKER_APPLY_MIGRATIONS}" = "default" ]; then
     EDGEDB_DOCKER_APPLY_MIGRATIONS="always"
   elif [ "${EDGEDB_DOCKER_APPLY_MIGRATIONS}" = "always" ] \
-       || [ "${EDGEDB_DOCKER_APPLY_MIGRATIONS}" = "always" ]
+       || [ "${EDGEDB_DOCKER_APPLY_MIGRATIONS}" = "never" ]
   then
     :
   else
