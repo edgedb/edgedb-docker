@@ -25,3 +25,23 @@ teardown() {
   [[ ${lines[3]} = "04-shell script late" ]]
   [[ ${lines[4]} = "05-edgeql file late" ]]
 }
+
+@test "full bootstrap tenant id" {
+  local container_id
+  local instance
+  local tenant_id
+
+  create_instance container_id instance '{"image":"edgedb-test:bootstrap"}' \
+    -- \
+    --tenant-id=tenant_id
+
+  output=$(edgedb -I "${instance}" query --output-format=tab-separated \
+    "SELECT Bootstrap.name ORDER BY Bootstrap.name")
+  echo "$output"
+  run echo "$output"
+  [[ ${lines[0]} = "01-shell script" ]]
+  [[ ${lines[1]} = "02-edgeql file" ]]
+  [[ ${lines[2]} = "03-edgeql file" ]]
+  [[ ${lines[3]} = "04-shell script late" ]]
+  [[ ${lines[4]} = "05-edgeql file late" ]]
+}

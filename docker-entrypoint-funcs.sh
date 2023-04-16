@@ -87,6 +87,14 @@ edbdocker_parse_args() {
         EDGEDB_SERVER_BACKEND_DSN="${1#*=}"
         shift
         ;;
+      --tenant-id)
+        _edbdocker_parse_arg "EDGEDB_SERVER_TENANT_ID" "$1" "$2"
+        shift 2
+        ;;
+      --tenant-id=*)
+        EDGEDB_SERVER_TENANT_ID="${1#*=}"
+        shift
+        ;;
       -P|--port)
         _edbdocker_parse_arg "EDGEDB_SERVER_PORT" "$1" "$2"
         shift 2
