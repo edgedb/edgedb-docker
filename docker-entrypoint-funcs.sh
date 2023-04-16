@@ -341,6 +341,10 @@ edbdocker_run_server() {
     server_args+=(--compiler-pool-size="${EDGEDB_SERVER_COMPILER_POOL_SIZE}")
   fi
 
+  if [ -n "${EDGEDB_SERVER_TENANT_ID}" ]; then
+    server_args+=(--tenant-id="${EDGEDB_SERVER_TENANT_ID}")
+  fi
+
   server_args+=( "${_EDGEDB_DOCKER_CMDLINE_ARGS[@]}" )
 
   status_file="$(edbdocker_mktemp_for_server)"
@@ -1142,6 +1146,10 @@ edbdocker_run_temp_server() {
     fi
   else
     server_opts+=(--data-dir="${EDGEDB_SERVER_DATADIR}")
+  fi
+
+  if [ -n "${EDGEDB_SERVER_TENANT_ID}" ]; then
+    server_opts+=(--tenant-id="${EDGEDB_SERVER_TENANT_ID}")
   fi
 
   if [ -n "${EDGEDB_SERVER_TLS_CERT_MODE}" ]; then
