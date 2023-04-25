@@ -87,6 +87,14 @@ edbdocker_parse_args() {
         EDGEDB_SERVER_BACKEND_DSN="${1#*=}"
         shift
         ;;
+      --tenant-id)
+        _edbdocker_parse_arg "EDGEDB_SERVER_TENANT_ID" "$1" "$2"
+        shift 2
+        ;;
+      --tenant-id=*)
+        EDGEDB_SERVER_TENANT_ID="${1#*=}"
+        shift
+        ;;
       -P|--port)
         _edbdocker_parse_arg "EDGEDB_SERVER_PORT" "$1" "$2"
         shift 2
@@ -331,6 +339,10 @@ edbdocker_run_server() {
 
   if [ -n "${EDGEDB_SERVER_COMPILER_POOL_SIZE}" ]; then
     server_args+=(--compiler-pool-size="${EDGEDB_SERVER_COMPILER_POOL_SIZE}")
+  fi
+
+  if [ -n "${EDGEDB_SERVER_TENANT_ID}" ]; then
+    server_args+=(--tenant-id="${EDGEDB_SERVER_TENANT_ID}")
   fi
 
   server_args+=( "${_EDGEDB_DOCKER_CMDLINE_ARGS[@]}" )
@@ -1134,6 +1146,10 @@ edbdocker_run_temp_server() {
     fi
   else
     server_opts+=(--data-dir="${EDGEDB_SERVER_DATADIR}")
+  fi
+
+  if [ -n "${EDGEDB_SERVER_TENANT_ID}" ]; then
+    server_opts+=(--tenant-id="${EDGEDB_SERVER_TENANT_ID}")
   fi
 
   if [ -n "${EDGEDB_SERVER_TLS_CERT_MODE}" ]; then
