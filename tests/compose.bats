@@ -6,12 +6,13 @@ setup() {
 }
 
 teardown() {
-    docker-compose logs
-    docker-compose rm --stop --force -v
+    docker compose logs
+    docker compose down --remove-orphans
+    docker compose rm --force --volumes
 }
 
 @test "composed app works" {
-    docker-compose up --detach --build
+    docker compose up --detach --build
     for i in {0..120}; do
         output=$(curl -s http://localhost:34089/increment/some) || output="500"
         if ! [[ $output =~ ^500 ]]; then
