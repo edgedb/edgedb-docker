@@ -33,7 +33,7 @@ teardown() {
 
   create_instance container_id instance '{"image":"edgedb-test:bootstrap"}' \
     -- \
-    --tenant-id=tenant_id
+    --tenant-id=tenantid
 
   output=$(edgedb -I "${instance}" query --output-format=tab-separated \
     "SELECT Bootstrap.name ORDER BY Bootstrap.name")
