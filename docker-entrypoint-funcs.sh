@@ -1224,12 +1224,18 @@ edbdocker_run_temp_server() {
     --emit-server-status="$status_file"
   )
 
+  # Collect PG* env vars to pass through
+  declare -a pg_vars
+  for var in $(env | grep -E "^PG" | cut -d '=' -f 1); do
+    pg_vars+=("$var=${!var}")
+  done
+
   # Start the server
   if [ "$(id -u)" = "0" ]; then
     gosu "${EDGEDB_SERVER_UID}" \
-      env -i "${EDGEDB_SERVER_BINARY}" "${server_opts[@]}" &
+      env -i "${pg_vars[@]}" "${EDGEDB_SERVER_BINARY}" "${server_opts[@]}" &
   else
-    env -i "${EDGEDB_SERVER_BINARY}" "${server_opts[@]}" &
+    env -i "${pg_vars[@]}" "${EDGEDB_SERVER_BINARY}" "${server_opts[@]}" &
   fi
   edgedb_pid="$!"
 
