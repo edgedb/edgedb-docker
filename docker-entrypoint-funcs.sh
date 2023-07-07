@@ -195,6 +195,14 @@ edbdocker_parse_args() {
         EDGEDB_SERVER_TLS_KEY_FILE="${1#*=}"
         shift
         ;;
+      --jws-key-file)
+        _edbdocker_parse_arg "EDGEDB_SERVER_JWS_KEY_FILE" "$1" "$2"
+        shift 2
+        ;;
+      --jws-key-file=*)
+        EDGEDB_SERVER_JWS_KEY_FILE="${1#*=}"
+        shift
+        ;;
       --emit-server-status)
         _edbdocker_parse_arg "EDGEDB_SERVER_EMIT_SERVER_STATUS" "$1" "$2"
         shift 2
@@ -331,6 +339,10 @@ edbdocker_run_server() {
     server_args+=(--tls-key-file="${EDGEDB_SERVER_TLS_KEY_FILE}")
   fi
 
+  if [ -n "${EDGEDB_SERVER_JWS_KEY_FILE}" ]; then
+    server_args+=(--jws-key-file="${EDGEDB_SERVER_JWS_KEY_FILE}")
+  fi
+
   if [ -n "${EDGEDB_SERVER_EMIT_SERVER_STATUS}" ]; then
     server_args+=(--emit-server-status="${EDGEDB_SERVER_EMIT_SERVER_STATUS}")
   fi
@@ -406,6 +418,7 @@ edbdocker_setup_env() {
   : "${EDGEDB_SERVER_TLS_CERT_MODE:=}"
   : "${EDGEDB_SERVER_TLS_CERT_FILE:=}"
   : "${EDGEDB_SERVER_TLS_KEY_FILE:=}"
+  : "${EDGEDB_SERVER_JWS_KEY_FILE:=}"
   : "${EDGEDB_SERVER_BOOTSTRAP_COMMAND:=}"
   : "${EDGEDB_SERVER_BOOTSTRAP_SCRIPT_FILE:=}"
   : "${EDGEDB_SERVER_COMPILER_POOL_MODE:=}"
@@ -538,6 +551,7 @@ edbdocker_setup_env() {
   edbdocker_lookup_env_var "EDGEDB_SERVER_PASSWORD"
   edbdocker_lookup_env_var "EDGEDB_SERVER_PASSWORD_HASH"
   edbdocker_lookup_env_var "EDGEDB_SERVER_BACKEND_DSN"
+  edbdocker_lookup_env_var "EDGEDB_SERVER_JWS_KEY" "" true
   edbdocker_lookup_env_var "EDGEDB_SERVER_TLS_KEY" "" true
   edbdocker_lookup_env_var "EDGEDB_SERVER_TLS_CERT" "" true
   edbdocker_lookup_env_var "EDGEDB_SERVER_TLS_CERT_MODE"
@@ -613,6 +627,7 @@ edbdocker_setup_env() {
 
   echo "EDGEDB_SERVER_TLS_CERT=${EDGEDB_SERVER_TLS_CERT_FILE}" >/tmp/edgedb/secrets
   echo "EDGEDB_SERVER_TLS_KEY=${EDGEDB_SERVER_TLS_KEY_FILE}" >>/tmp/edgedb/secrets
+  echo "EDGEDB_SERVER_JWS_KEY=${EDGEDB_SERVER_JWS_KEY_FILE}" >>/tmp/edgedb/secrets
 
   if [ "${EDGEDB_SERVER_DEFAULT_AUTH_METHOD}" = "default" ]; then
     EDGEDB_SERVER_DEFAULT_AUTH_METHOD="SCRAM"
