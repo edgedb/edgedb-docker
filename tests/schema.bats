@@ -37,3 +37,24 @@ teardown() {
   edgedb -I "${instance}" query --output-format=tab-separated \
     "CREATE TYPE Item"
 }
+
+@test "apply schema to named database" {
+  local container_id
+  local instance
+
+  create_instance container_id instance '{
+        "image":"edgedb-test:schema",
+        "database":"hello"
+    }' \
+    --env=EDGEDB_SERVER_DATABASE=hello
+
+  # wait until migrations are complete
+  sleep 3
+
+  run edgedb -I "${instance}" query "SELECT sys::get_current_database()"
+  echo "${lines[@]}"
+  [[ ${lines[-1]} = '"hello"' ]]
+
+  edgedb -I "${instance}" query --output-format=tab-separated \
+    "INSERT Item { name := 'hello' }"
+}
