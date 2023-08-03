@@ -87,6 +87,14 @@ edbdocker_parse_args() {
         EDGEDB_SERVER_BACKEND_DSN="${1#*=}"
         shift
         ;;
+      --tenant-id)
+        _edbdocker_parse_arg "EDGEDB_SERVER_TENANT_ID" "$1" "$2"
+        shift 2
+        ;;
+      --tenant-id=*)
+        EDGEDB_SERVER_TENANT_ID="${1#*=}"
+        shift
+        ;;
       -P|--port)
         _edbdocker_parse_arg "EDGEDB_SERVER_PORT" "$1" "$2"
         shift 2
@@ -143,6 +151,14 @@ edbdocker_parse_args() {
         EDGEDB_SERVER_SECURITY="${1#*=}"
         shift
         ;;
+      --binary-endpoint-security)
+        _edbdocker_parse_arg "EDGEDB_SERVER_BINARY_ENDPOINT_SECURITY" "$1" "$2"
+        shift 2
+        ;;
+      --binary-endpoint-security=*)
+        EDGEDB_SERVER_BINARY_ENDPOINT_SECURITY="${1#*=}"
+        shift
+        ;;
       --http-endpoint-security)
         _edbdocker_parse_arg "EDGEDB_SERVER_HTTP_ENDPOINT_SECURITY" "$1" "$2"
         shift 2
@@ -177,6 +193,14 @@ edbdocker_parse_args() {
         ;;
       --tls-key-file=*)
         EDGEDB_SERVER_TLS_KEY_FILE="${1#*=}"
+        shift
+        ;;
+      --jws-key-file)
+        _edbdocker_parse_arg "EDGEDB_SERVER_JWS_KEY_FILE" "$1" "$2"
+        shift 2
+        ;;
+      --jws-key-file=*)
+        EDGEDB_SERVER_JWS_KEY_FILE="${1#*=}"
         shift
         ;;
       --emit-server-status)
@@ -270,6 +294,14 @@ edbdocker_run_server() {
     return
   fi
 
+  if [ -n "${EDGEDB_SERVER_INSTANCE_NAME}" ]; then
+    server_args+=(--instance-name="${EDGEDB_SERVER_INSTANCE_NAME}")
+  fi
+
+  if [ -n "${EDGEDB_SERVER_LOG_LEVEL}" ]; then
+    server_args+=(--log-level="${EDGEDB_SERVER_LOG_LEVEL}")
+  fi
+
   IFS=',' read -ra bind_addrs <<< "$EDGEDB_SERVER_BIND_ADDRESS"
   for bind_addr in "${bind_addrs[@]}"; do
     server_args+=(
@@ -307,6 +339,10 @@ edbdocker_run_server() {
     server_args+=(--tls-key-file="${EDGEDB_SERVER_TLS_KEY_FILE}")
   fi
 
+  if [ -n "${EDGEDB_SERVER_JWS_KEY_FILE}" ]; then
+    server_args+=(--jws-key-file="${EDGEDB_SERVER_JWS_KEY_FILE}")
+  fi
+
   if [ -n "${EDGEDB_SERVER_EMIT_SERVER_STATUS}" ]; then
     server_args+=(--emit-server-status="${EDGEDB_SERVER_EMIT_SERVER_STATUS}")
   fi
@@ -321,6 +357,10 @@ edbdocker_run_server() {
     server_args+=(--default-auth-method="${EDGEDB_SERVER_DEFAULT_AUTH_METHOD}")
   fi
 
+  if [ -n "${EDGEDB_SERVER_BINARY_ENDPOINT_SECURITY}" ]; then
+    server_args+=(--binary-endpoint-security="${EDGEDB_SERVER_BINARY_ENDPOINT_SECURITY}")
+  fi
+
   if [ -n "${EDGEDB_SERVER_HTTP_ENDPOINT_SECURITY}" ]; then
     server_args+=(--http-endpoint-security="${EDGEDB_SERVER_HTTP_ENDPOINT_SECURITY}")
   fi
@@ -331,6 +371,10 @@ edbdocker_run_server() {
 
   if [ -n "${EDGEDB_SERVER_COMPILER_POOL_SIZE}" ]; then
     server_args+=(--compiler-pool-size="${EDGEDB_SERVER_COMPILER_POOL_SIZE}")
+  fi
+
+  if [ -n "${EDGEDB_SERVER_TENANT_ID}" ]; then
+    server_args+=(--tenant-id="${EDGEDB_SERVER_TENANT_ID}")
   fi
 
   server_args+=( "${_EDGEDB_DOCKER_CMDLINE_ARGS[@]}" )
@@ -356,8 +400,10 @@ edbdocker_setup_env() {
   : "${EDGEDB_DOCKER_SHOW_GENERATED_CERT:=default}"
   : "${EDGEDB_DOCKER_APPLY_MIGRATIONS:=default}"
   : "${EDGEDB_DOCKER_BOOTSTRAP_TIMEOUT_SEC:=300}"
+  : "${EDGEDB_SERVER_BINARY_ENDPOINT_SECURITY:=}"
   : "${EDGEDB_SERVER_HTTP_ENDPOINT_SECURITY:=}"
   : "${EDGEDB_SERVER_UID:=edgedb}"
+  : "${EDGEDB_SERVER_INSTANCE_NAME:=}"
   : "${EDGEDB_SERVER_BINARY:=edgedb-server}"
   : "${EDGEDB_SERVER_DATADIR:=}"
   : "${EDGEDB_SERVER_BACKEND_DSN:=}"
@@ -368,13 +414,16 @@ edbdocker_setup_env() {
   : "${EDGEDB_SERVER_ADMIN_UI:=}"
   : "${EDGEDB_SERVER_BOOTSTRAP_ONLY:=}"
   : "${EDGEDB_SERVER_DEFAULT_AUTH_METHOD:=}"
+  : "${EDGEDB_SERVER_LOG_LEVEL:=}"
   : "${EDGEDB_SERVER_TLS_CERT_MODE:=}"
   : "${EDGEDB_SERVER_TLS_CERT_FILE:=}"
   : "${EDGEDB_SERVER_TLS_KEY_FILE:=}"
+  : "${EDGEDB_SERVER_JWS_KEY_FILE:=}"
   : "${EDGEDB_SERVER_BOOTSTRAP_COMMAND:=}"
   : "${EDGEDB_SERVER_BOOTSTRAP_SCRIPT_FILE:=}"
   : "${EDGEDB_SERVER_COMPILER_POOL_MODE:=}"
   : "${EDGEDB_SERVER_COMPILER_POOL_SIZE:=}"
+  : "${EDGEDB_SERVER_TENANT_ID:=}"
 
   if [ -n "${EDGEDB_SERVER_BOOTSTRAP_SCRIPT_FILE:-}" ]; then
     if [ -n "${EDGEDB_SERVER_BOOTSTRAP_COMMAND_FILE}" ]; then
@@ -502,6 +551,7 @@ edbdocker_setup_env() {
   edbdocker_lookup_env_var "EDGEDB_SERVER_PASSWORD"
   edbdocker_lookup_env_var "EDGEDB_SERVER_PASSWORD_HASH"
   edbdocker_lookup_env_var "EDGEDB_SERVER_BACKEND_DSN"
+  edbdocker_lookup_env_var "EDGEDB_SERVER_JWS_KEY" "" true
   edbdocker_lookup_env_var "EDGEDB_SERVER_TLS_KEY" "" true
   edbdocker_lookup_env_var "EDGEDB_SERVER_TLS_CERT" "" true
   edbdocker_lookup_env_var "EDGEDB_SERVER_TLS_CERT_MODE"
@@ -577,6 +627,7 @@ edbdocker_setup_env() {
 
   echo "EDGEDB_SERVER_TLS_CERT=${EDGEDB_SERVER_TLS_CERT_FILE}" >/tmp/edgedb/secrets
   echo "EDGEDB_SERVER_TLS_KEY=${EDGEDB_SERVER_TLS_KEY_FILE}" >>/tmp/edgedb/secrets
+  echo "EDGEDB_SERVER_JWS_KEY=${EDGEDB_SERVER_JWS_KEY_FILE}" >>/tmp/edgedb/secrets
 
   if [ "${EDGEDB_SERVER_DEFAULT_AUTH_METHOD}" = "default" ]; then
     EDGEDB_SERVER_DEFAULT_AUTH_METHOD="SCRAM"
@@ -970,6 +1021,9 @@ edbdocker_run_migrations() {
 
 _edbdocker_migrations_cb() {
   shift  # Ignore the server status data in the first argument.
+  if ! [ -e /dbschema/migrations ]; then
+    return 0
+  fi
   if ! edbdocker_cli "${@}" -- migrate --schema-dir=/dbschema; then
     edbdocker_log "ERROR: Migrations failed. Stopping server."
     return 1
@@ -1136,6 +1190,18 @@ edbdocker_run_temp_server() {
     server_opts+=(--data-dir="${EDGEDB_SERVER_DATADIR}")
   fi
 
+  if [ -n "${EDGEDB_SERVER_INSTANCE_NAME}" ]; then
+    server_opts+=(--instance-name="${EDGEDB_SERVER_INSTANCE_NAME}")
+  fi
+
+  if [ -n "${EDGEDB_SERVER_LOG_LEVEL}" ]; then
+    server_opts+=(--log-level="${EDGEDB_SERVER_LOG_LEVEL}")
+  fi
+
+  if [ -n "${EDGEDB_SERVER_TENANT_ID}" ]; then
+    server_opts+=(--tenant-id="${EDGEDB_SERVER_TENANT_ID}")
+  fi
+
   if [ -n "${EDGEDB_SERVER_TLS_CERT_MODE}" ]; then
     if edbdocker_server_supports "--tls-cert-mode"; then
       server_opts+=(--tls-cert-mode="${EDGEDB_SERVER_TLS_CERT_MODE}")
@@ -1173,12 +1239,18 @@ edbdocker_run_temp_server() {
     --emit-server-status="$status_file"
   )
 
+  # Collect PG* env vars to pass through
+  declare -a pg_vars
+  for var in $(env | grep -E "^PG" | cut -d '=' -f 1); do
+    pg_vars+=("$var=${!var}")
+  done
+
   # Start the server
   if [ "$(id -u)" = "0" ]; then
     gosu "${EDGEDB_SERVER_UID}" \
-      "${EDGEDB_SERVER_BINARY}" "${server_opts[@]}" &
+      env -i "${pg_vars[@]}" "${EDGEDB_SERVER_BINARY}" "${server_opts[@]}" &
   else
-    "${EDGEDB_SERVER_BINARY}" "${server_opts[@]}" &
+    env -i "${pg_vars[@]}" "${EDGEDB_SERVER_BINARY}" "${server_opts[@]}" &
   fi
   edgedb_pid="$!"
 

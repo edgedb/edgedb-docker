@@ -22,6 +22,7 @@ latest_server_ver() {
      .packages[]
      | select(.basename == \"edgedb-server\")
      | select(.slot | contains(\"-rc\") | not)
+     | select(.architecture == \"$(arch)\")
      | .version_key"
 
   ver_key=$(echo "$index" \
@@ -193,6 +194,6 @@ common_teardown() {
     docker rm -f "${containers[@]}" || :
   fi
   for instance in "${instances[@]}"; do
-    edgedb instance unlink "${instance}" || :
+    edgedb instance unlink -I "${instance}" || :
   done
 }

@@ -1,2 +1,2 @@
 aiohttp~=3.8.1
-edgedb~=0.18.3
+edgedb>=1.5.0
