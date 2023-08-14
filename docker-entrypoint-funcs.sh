@@ -1284,6 +1284,7 @@ edbdocker_run_temp_server() {
       EDGEDB_HOST="127.0.0.1"
       EDGEDB_PORT="${port}"
       EDGEDB_CLIENT_TLS_SECURITY="insecure"
+      EDGEDB_DATABASE="$EDGEDB_SERVER_DATABASE"
     )
 
     if [ -n "${tls_cert_file}" ]; then
