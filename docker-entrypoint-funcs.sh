@@ -1044,14 +1044,14 @@ _edbdocker_bootstrap_abort_cb() {
 
 
 # Runs schema migrations found in /dbschema unless
-# EDGEDB_SERVER_SKIP_MIGRATIONS is set.  Expects either EDGEDB_SERVER_DATADIR
+# EDGEDB_DOCKER_APPLY_MIGRATIONS=never.  Expects either EDGEDB_SERVER_DATADIR
 # or EDGEDB_SERVER_BACKEND_DSN to be set in the environment.  Migrations are
 # applied by a temporary edgedb-server process that gets started on a random
 # port and is shut down once bootstrap is complete.
 #
 # Usage: `EDGEDB_SERVER_DATADIR=/foo/bar edbdocker_run_migrations`
 edbdocker_run_migrations() {
-  if [ -d "/dbschema" ] && [ -z "${EDGEDB_SERVER_SKIP_MIGRATIONS:-}" ]; then
+  if [ -d "/dbschema" ] && [ "${EDGEDB_DOCKER_APPLY_MIGRATIONS}" != "never" ]; then
     edbdocker_log_at_level "info" "Applying schema migrations..."
     edbdocker_run_temp_server \
       _edbdocker_migrations_cb \
