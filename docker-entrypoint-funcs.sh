@@ -51,6 +51,10 @@ _EDGEDB_DOCKER_CMDLINE_ARGS=()
 # Set by a caller to edbdocker_die() to signal a specific exict code.
 EDGEDB_DOCKER_ABORT_CODE=1
 
+# VERSION was set in Dockerfile, in the format of either a single major version
+# like "5", or a nightly like "6-3762"
+VERSION_MAJOR=$(echo "${VERSION}" | awk -F '-' '{print $1}')
+
 
 edbdocker_parse_args() {
   if [ "${1:0:1}" != '-' ]; then
@@ -547,7 +551,8 @@ edbdocker_setup_env() {
   edbdocker_lookup_env_var "EDGEDB_SERVER_BIND_ADDRESS" "0.0.0.0,::"
   edbdocker_lookup_env_var "EDGEDB_SERVER_DEFAULT_AUTH_METHOD" "${EDGEDB_SERVER_AUTH_METHOD-default}"
   edbdocker_lookup_env_var "EDGEDB_SERVER_USER" "edgedb"
-  edbdocker_lookup_env_var "EDGEDB_SERVER_DATABASE" "edgedb"
+  edbdocker_lookup_env_var "EDGEDB_SERVER_DATABASE"
+  edbdocker_lookup_env_var "EDGEDB_SERVER_DEFAULT_BRANCH"
   edbdocker_lookup_env_var "EDGEDB_SERVER_PASSWORD"
   edbdocker_lookup_env_var "EDGEDB_SERVER_PASSWORD_HASH"
   edbdocker_lookup_env_var "EDGEDB_SERVER_BACKEND_DSN"
@@ -558,6 +563,40 @@ edbdocker_setup_env() {
   edbdocker_lookup_env_var "EDGEDB_SERVER_BOOTSTRAP_COMMAND"
   edbdocker_lookup_env_var "EDGEDB_SERVER_COMPILER_POOL_MODE"
   edbdocker_lookup_env_var "EDGEDB_SERVER_COMPILER_POOL_SIZE"
+
+  if [ "${VERSION_MAJOR}" -ge 5 ]; then
+    if [ -n "${EDGEDB_SERVER_DATABASE}" ]; then
+      if [ -n "${EDGEDB_SERVER_DEFAULT_BRANCH}" ]; then
+        edbdocker_die "ERROR: EDGEDB_SERVER_DATABASE and EDGEDB_SERVER_DEFAULT_BRANCH are mutually exclusive, but both are set"
+      else
+        msg=(
+          "======================================================="
+          "WARNING: EDGEDB_SERVER_DATABASE is deprecated.      "
+          "         Use EDGEDB_SERVER_DEFAULT_BRANCH instead."
+          "======================================================="
+        )
+        edbdocker_log_at_level "warning" "${msg[@]}"
+        EDGEDB_SERVER_DEFAULT_BRANCH="${EDGEDB_SERVER_DATABASE}"
+      fi
+    else
+      if [ -z "${EDGEDB_SERVER_DEFAULT_BRANCH}" ]; then
+        EDGEDB_SERVER_DEFAULT_BRANCH="main"
+      fi
+    fi
+  else
+    if [ -n "${EDGEDB_SERVER_DEFAULT_BRANCH}" ]; then
+      msg=(
+        "======================================================="
+        "WARNING: EDGEDB_SERVER_DEFAULT_BRANCH is ignored"
+        "         on server versions prior to 5.0."
+        "======================================================="
+      )
+      edbdocker_log_at_level "warning" "${msg[@]}"
+    fi
+    if [ -z "${EDGEDB_SERVER_DATABASE}" ]; then
+      EDGEDB_SERVER_DATABASE="edgedb"
+    fi
+  fi
 
   if [ -n "${EDGEDB_SERVER_TLS_KEY_FILE}" ] && [ -z "${EDGEDB_SERVER_TLS_CERT_FILE}" ]; then
     edbdocker_die "ERROR: EDGEDB_SERVER_TLS_CERT_FILE must be set when EDGEDB_SERVER_TLS_KEY_FILE is set"
@@ -973,9 +1012,11 @@ _edbdocker_bootstrap_cb() {
 
   _edbdocker_print_last_generated_cert_if_needed "$status"
 
-  if [ "$EDGEDB_SERVER_DATABASE" != "edgedb" ]; then
-    echo "CREATE DATABASE \`${EDGEDB_SERVER_DATABASE}\`;" \
-      | edbdocker_cli "${conn_opts[@]}" -- --database="edgedb"
+  if [ "${VERSION_MAJOR}" -lt 5 ]; then
+    if [ "${EDGEDB_SERVER_DATABASE}" != "edgedb" ]; then
+      echo "CREATE DATABASE \`${EDGEDB_SERVER_DATABASE}\`;" \
+        | edbdocker_cli "${conn_opts[@]}" -- --database="edgedb"
+    fi
   fi
 
   _edbdocker_bootstrap_run_hooks "/edgedb-bootstrap.d" "${conn_opts[@]}"
@@ -1003,14 +1044,14 @@ _edbdocker_bootstrap_abort_cb() {
 
 
 # Runs schema migrations found in /dbschema unless
-# EDGEDB_SERVER_SKIP_MIGRATIONS is set.  Expects either EDGEDB_SERVER_DATADIR
+# EDGEDB_DOCKER_APPLY_MIGRATIONS=never.  Expects either EDGEDB_SERVER_DATADIR
 # or EDGEDB_SERVER_BACKEND_DSN to be set in the environment.  Migrations are
 # applied by a temporary edgedb-server process that gets started on a random
 # port and is shut down once bootstrap is complete.
 #
 # Usage: `EDGEDB_SERVER_DATADIR=/foo/bar edbdocker_run_migrations`
 edbdocker_run_migrations() {
-  if [ -d "/dbschema" ] && [ -z "${EDGEDB_SERVER_SKIP_MIGRATIONS:-}" ]; then
+  if [ -d "/dbschema" ] && [ "${EDGEDB_DOCKER_APPLY_MIGRATIONS}" != "never" ]; then
     edbdocker_log_at_level "info" "Applying schema migrations..."
     edbdocker_run_temp_server \
       _edbdocker_migrations_cb \
@@ -1224,6 +1265,12 @@ edbdocker_run_temp_server() {
     server_opts+=(--tls-key-file="${EDGEDB_SERVER_TLS_KEY_FILE}")
   fi
 
+  if [ "${VERSION_MAJOR}" -ge 5 ]; then
+    if [ -n "${EDGEDB_SERVER_DEFAULT_BRANCH}" ]; then
+      server_opts+=(--default-branch="${EDGEDB_SERVER_DEFAULT_BRANCH}")
+    fi
+  fi
+
   if edbdocker_server_supports "--compiler-pool-mode"; then
     server_opts+=(--compiler-pool-mode="on_demand")
   fi
@@ -1284,8 +1331,13 @@ edbdocker_run_temp_server() {
       EDGEDB_HOST="127.0.0.1"
       EDGEDB_PORT="${port}"
       EDGEDB_CLIENT_TLS_SECURITY="insecure"
-      EDGEDB_DATABASE="$EDGEDB_SERVER_DATABASE"
     )
+
+    if [ "${VERSION_MAJOR}" -lt 5 ]; then
+      conn_opts+=(
+        EDGEDB_DATABASE="$EDGEDB_SERVER_DATABASE"
+      )
+    fi
 
     if [ -n "${tls_cert_file}" ]; then
       conn_opts+=(
