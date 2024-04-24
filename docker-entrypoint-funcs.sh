@@ -51,6 +51,10 @@ _EDGEDB_DOCKER_CMDLINE_ARGS=()
 # Set by a caller to edbdocker_die() to signal a specific exict code.
 EDGEDB_DOCKER_ABORT_CODE=1
 
+# VERSION was set in Dockerfile, in the format of either a single major version
+# like "5", or a nightly like "6-3762"
+VERSION_MAJOR=$(echo "${VERSION}" | awk -F '-' '{print $1}')
+
 
 edbdocker_parse_args() {
   if [ "${1:0:1}" != '-' ]; then
@@ -560,7 +564,7 @@ edbdocker_setup_env() {
   edbdocker_lookup_env_var "EDGEDB_SERVER_COMPILER_POOL_MODE"
   edbdocker_lookup_env_var "EDGEDB_SERVER_COMPILER_POOL_SIZE"
 
-  if [ "$(echo "${VERSION}" | awk -F '-' '{print $1}')" -ge 5 ]; then
+  if [ "${VERSION_MAJOR}" -ge 5 ]; then
     if [ -n "${EDGEDB_SERVER_DATABASE}" ]; then
       if [ -n "${EDGEDB_SERVER_DEFAULT_BRANCH}" ]; then
         edbdocker_die "ERROR: EDGEDB_SERVER_DATABASE and EDGEDB_SERVER_DEFAULT_BRANCH are mutually exclusive, but both are set"
@@ -584,7 +588,7 @@ edbdocker_setup_env() {
       msg=(
         "======================================================="
         "WARNING: EDGEDB_SERVER_DEFAULT_BRANCH is ignored"
-        "         because it's for 5.0 and above."
+        "         on server versions prior to 5.0."
         "======================================================="
       )
       edbdocker_log_at_level "warning" "${msg[@]}"
@@ -1008,7 +1012,7 @@ _edbdocker_bootstrap_cb() {
 
   _edbdocker_print_last_generated_cert_if_needed "$status"
 
-  if [ "$(echo "${VERSION}" | awk -F '-' '{print $1}')" -lt 5 ]; then
+  if [ "${VERSION_MAJOR}" -lt 5 ]; then
     if [ "${EDGEDB_SERVER_DATABASE}" != "edgedb" ]; then
       echo "CREATE DATABASE \`${EDGEDB_SERVER_DATABASE}\`;" \
         | edbdocker_cli "${conn_opts[@]}" -- --database="edgedb"
@@ -1261,7 +1265,7 @@ edbdocker_run_temp_server() {
     server_opts+=(--tls-key-file="${EDGEDB_SERVER_TLS_KEY_FILE}")
   fi
 
-  if [ "$(echo "${VERSION}" | awk -F '-' '{print $1}')" -ge 5 ]; then
+  if [ "${VERSION_MAJOR}" -ge 5 ]; then
     if [ -n "${EDGEDB_SERVER_DEFAULT_BRANCH}" ]; then
       server_opts+=(--default-branch="${EDGEDB_SERVER_DEFAULT_BRANCH}")
     fi
@@ -1329,7 +1333,7 @@ edbdocker_run_temp_server() {
       EDGEDB_CLIENT_TLS_SECURITY="insecure"
     )
 
-    if [ "$(echo "${VERSION}" | awk -F '-' '{print $1}')" -lt 5 ]; then
+    if [ "${VERSION_MAJOR}" -lt 5 ]; then
       conn_opts+=(
         EDGEDB_DATABASE="$EDGEDB_SERVER_DATABASE"
       )
