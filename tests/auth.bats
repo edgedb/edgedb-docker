@@ -89,6 +89,18 @@ teardown() {
   [[ ${lines[-1]} = '"hello"' ]]
 }
 
+@test "custom default branch" {
+  local container_id
+  local instance
+
+  create_instance container_id instance '{}' \
+    --env=EDGEDB_SERVER_DEFAULT_BRANCH=hello
+
+  run edgedb -I "${instance}" query "SELECT sys::get_current_database()"
+  echo "${lines[@]}"
+  [[ ${lines[-1]} = '"hello"' ]]
+}
+
 @test "tls in env vars" {
   local container_id
   local instance
