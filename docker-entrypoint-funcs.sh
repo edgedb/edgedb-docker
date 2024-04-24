@@ -377,12 +377,6 @@ edbdocker_run_server() {
     server_args+=(--tenant-id="${EDGEDB_SERVER_TENANT_ID}")
   fi
 
-  if [ "${VERSION}" -ge 5 ]; then
-    if [ -n "${EDGEDB_SERVER_DEFAULT_BRANCH}" ]; then
-      server_args+=(--default-branch="${EDGEDB_SERVER_DEFAULT_BRANCH}")
-    fi
-  fi
-
   server_args+=( "${_EDGEDB_DOCKER_CMDLINE_ARGS[@]}" )
 
   status_file="$(edbdocker_mktemp_for_server)"
@@ -1267,6 +1261,12 @@ edbdocker_run_temp_server() {
     server_opts+=(--tls-key-file="${EDGEDB_SERVER_TLS_KEY_FILE}")
   fi
 
+  if [ "${VERSION}" -ge 5 ]; then
+    if [ -n "${EDGEDB_SERVER_DEFAULT_BRANCH}" ]; then
+      server_opts+=(--default-branch="${EDGEDB_SERVER_DEFAULT_BRANCH}")
+    fi
+  fi
+
   if edbdocker_server_supports "--compiler-pool-mode"; then
     server_opts+=(--compiler-pool-mode="on_demand")
   fi
@@ -1329,11 +1329,7 @@ edbdocker_run_temp_server() {
       EDGEDB_CLIENT_TLS_SECURITY="insecure"
     )
 
-    if [ "${VERSION}" -ge 5 ]; then
-      conn_opts+=(
-        EDGEDB_BRANCH="${EDGEDB_SERVER_DEFAULT_BRANCH}"
-      )
-    else
+    if [ "${VERSION}" -lt 5 ]; then
       conn_opts+=(
         EDGEDB_DATABASE="$EDGEDB_SERVER_DATABASE"
       )
