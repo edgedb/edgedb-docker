@@ -9,7 +9,7 @@ latest_server_ver() {
   local jq_query
   local ver_key
 
-  dist="buster"
+  dist="bookworm"
   subdist="${1:-nightly}"
   if [ -n "${subdist}" ]; then
     dist+=".${subdist}"

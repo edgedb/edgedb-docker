@@ -1,4 +1,4 @@
-FROM debian:buster-slim
+FROM debian:bookworm-slim
 ARG version
 ARG exact_version
 ARG subdist
@@ -36,7 +36,7 @@ export DEBIAN_FRONTEND=noninteractive; \
 && curl --proto '=https' --tlsv1.2 -sSf \
     -o /usr/local/share/keyrings/edgedb-keyring.gpg \
     https://packages.edgedb.com/keys/edgedb-keyring.gpg \
-&& echo "deb [signed-by=/usr/local/share/keyrings/edgedb-keyring.gpg] https://packages.edgedb.com/apt buster ${subdist:-main}" \
+&& echo "deb [signed-by=/usr/local/share/keyrings/edgedb-keyring.gpg] https://packages.edgedb.com/apt bookworm ${subdist:-main}" \
     > "/etc/apt/sources.list.d/edgedb.list" \
 && ( \
     for i in $(seq 1 5); do [ $i -gt 1 ] && sleep 1; \
