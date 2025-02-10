@@ -30,14 +30,16 @@ edbdocker_setup_shell() {
 edbdocker_is_server_command() {
   [ $# -eq 0 ] \
   || [ "${1:0:1}" = "-" ] \
-  || [ "$1" = "edgedb-server" ] \
+  || [ "$1" = "server" ] \
   && [ -z "${_EDBDOCKER_SHOW_HELP:-}" ]
 }
 
 
 edbdocker_run_regular_command() {
   if [ "${1:0:1}" = '-' ]; then
-    set -- edgedb-server "$@"
+    set -- "$DEFAULT_SERVER_BINARY" "$@"
+  else
+    set -- "$DEFAULT_SERVER_BINARY" "${@:1}"
   fi
 
   exec "$@"
@@ -389,7 +391,7 @@ edbdocker_run_server() {
     "$(_edbdocker_wait_for_status "$status_file")" &
 
   # shellcheck disable=SC2086
-  set -- edgedb-server "${server_args[@]}" ${EDGEDB_SERVER_EXTRA_ARGS:-}
+  set -- "$DEFAULT_SERVER_BINARY" "${server_args[@]}" ${EDGEDB_SERVER_EXTRA_ARGS:-}
 
   if [ "$(id -u)" = "0" ]; then
     exec gosu "${EDGEDB_SERVER_UID}" "$@"
@@ -406,9 +408,9 @@ edbdocker_setup_env() {
   : "${EDGEDB_DOCKER_BOOTSTRAP_TIMEOUT_SEC:=300}"
   : "${EDGEDB_SERVER_BINARY_ENDPOINT_SECURITY:=}"
   : "${EDGEDB_SERVER_HTTP_ENDPOINT_SECURITY:=}"
-  : "${EDGEDB_SERVER_UID:=edgedb}"
+  : "${EDGEDB_SERVER_UID:=$DEFAULT_OS_USER}"
   : "${EDGEDB_SERVER_INSTANCE_NAME:=}"
-  : "${EDGEDB_SERVER_BINARY:=edgedb-server}"
+  : "${EDGEDB_SERVER_BINARY:=$DEFAULT_SERVER_BINARY}"
   : "${EDGEDB_SERVER_DATADIR:=}"
   : "${EDGEDB_SERVER_BACKEND_DSN:=}"
   : "${EDGEDB_SERVER_PASSWORD:=}"
@@ -446,7 +448,7 @@ edbdocker_setup_env() {
 
   if [ -z "${EDGEDB_SERVER_UID:-}" ]; then
     if [ "$(id -u)" = "0" ]; then
-      EDGEDB_SERVER_UID="edgedb"
+      EDGEDB_SERVER_UID="$DEFAULT_OS_USER"
     else
       EDGEDB_SERVER_UID="$(id -un)"
     fi
@@ -454,9 +456,9 @@ edbdocker_setup_env() {
 
   if [ -z "${EDGEDB_SERVER_RUNSTATE_DIR:-}" ]; then
     if [ "$(id -u)" = "0" ]; then
-      EDGEDB_SERVER_RUNSTATE_DIR="/run/edgedb"
+      EDGEDB_SERVER_RUNSTATE_DIR="/run/${BRANDING}"
     else
-      EDGEDB_SERVER_RUNSTATE_DIR="/tmp/edgedb"
+      EDGEDB_SERVER_RUNSTATE_DIR="/tmp/${BRANDING}"
     fi
   fi
 
@@ -547,10 +549,16 @@ edbdocker_setup_env() {
     fi
   fi
 
+  if [ "${VERSION_MAJOR}" -ge 6 ]; then
+    DEFAULT_SERVER_USER="admin"
+  else
+    DEFAULT_SERVER_USER="edgedb"
+  fi
+
   edbdocker_lookup_env_var "EDGEDB_SERVER_PORT" "5656"
   edbdocker_lookup_env_var "EDGEDB_SERVER_BIND_ADDRESS" "0.0.0.0,::"
   edbdocker_lookup_env_var "EDGEDB_SERVER_DEFAULT_AUTH_METHOD" "${EDGEDB_SERVER_AUTH_METHOD-default}"
-  edbdocker_lookup_env_var "EDGEDB_SERVER_USER" "edgedb"
+  edbdocker_lookup_env_var "EDGEDB_SERVER_USER" "$DEFAULT_SERVER_USER"
   edbdocker_lookup_env_var "EDGEDB_SERVER_DATABASE"
   edbdocker_lookup_env_var "EDGEDB_SERVER_DEFAULT_BRANCH"
   edbdocker_lookup_env_var "EDGEDB_SERVER_PASSWORD"
@@ -609,7 +617,7 @@ edbdocker_setup_env() {
   if [ -n "${EDGEDB_SERVER_DATADIR}" ] && [ -n "${EDGEDB_SERVER_BACKEND_DSN}" ]; then
     edbdocker_die "ERROR: EDGEDB_SERVER_DATADIR and EDGEDB_SERVER_BACKEND_DSN are mutually exclusive, but both are set"
   elif [ -z "${EDGEDB_SERVER_BACKEND_DSN}" ]; then
-    EDGEDB_SERVER_DATADIR="${EDGEDB_SERVER_DATADIR:-/var/lib/edgedb/data}"
+    EDGEDB_SERVER_DATADIR="${EDGEDB_SERVER_DATADIR:-/var/lib/$BRANDING/data}"
   fi
 
   if [ -n "${EDGEDB_SERVER_PASSWORD}" ] && [ -n "${EDGEDB_SERVER_PASSWORD_HASH}" ]; then
@@ -649,24 +657,24 @@ edbdocker_setup_env() {
     fi
   fi
 
-  mkdir -p /tmp/edgedb
+  mkdir -p "/tmp/$BRANDING"
   if [ "$(id -u)" = "0" ]; then
-    chown "${EDGEDB_SERVER_UID}" "/tmp/edgedb"
+    chown "${EDGEDB_SERVER_UID}" "/tmp/$BRANDING"
   fi
 
   if [ -z "${EDGEDB_SERVER_TLS_CERT_FILE}" ]; then
     if [ -z "${EDGEDB_SERVER_DATADIR}" ]; then
-      EDGEDB_SERVER_TLS_CERT_FILE="/tmp/edgedb/edbtlscert.pem"
-      EDGEDB_SERVER_TLS_KEY_FILE="/tmp/edgedb/edbprivkey.pem"
+      EDGEDB_SERVER_TLS_CERT_FILE="/tmp/$BRANDING/edbtlscert.pem"
+      EDGEDB_SERVER_TLS_KEY_FILE="/tmp/$BRANDING/edbprivkey.pem"
     else
       EDGEDB_SERVER_TLS_CERT_FILE="${EDGEDB_SERVER_DATADIR}/edbtlscert.pem"
       EDGEDB_SERVER_TLS_KEY_FILE="${EDGEDB_SERVER_DATADIR}/edbprivkey.pem"
     fi
   fi
 
-  echo "EDGEDB_SERVER_TLS_CERT=${EDGEDB_SERVER_TLS_CERT_FILE}" >/tmp/edgedb/secrets
-  echo "EDGEDB_SERVER_TLS_KEY=${EDGEDB_SERVER_TLS_KEY_FILE}" >>/tmp/edgedb/secrets
-  echo "EDGEDB_SERVER_JWS_KEY=${EDGEDB_SERVER_JWS_KEY_FILE}" >>/tmp/edgedb/secrets
+  echo "EDGEDB_SERVER_TLS_CERT=${EDGEDB_SERVER_TLS_CERT_FILE}" >"/tmp/${BRANDING}/secrets"
+  echo "EDGEDB_SERVER_TLS_KEY=${EDGEDB_SERVER_TLS_KEY_FILE}" >>"/tmp/${BRANDING}/secrets"
+  echo "EDGEDB_SERVER_JWS_KEY=${EDGEDB_SERVER_JWS_KEY_FILE}" >>"/tmp/${BRANDING}/secrets"
 
   if [ "${EDGEDB_SERVER_DEFAULT_AUTH_METHOD}" = "default" ]; then
     EDGEDB_SERVER_DEFAULT_AUTH_METHOD="SCRAM"
@@ -834,7 +842,7 @@ edbdocker_remote_cluster_is_initialized() {
   local psql
 
   pg_dsn="$1"
-  psql="$(dirname "$(readlink -f /usr/bin/edgedb-server)")/psql"
+  psql="$(dirname "$(readlink -f /usr/bin/${DEFAULT_SERVER_BINARY})")/psql"
 
   if echo "\\l" \
      | "$psql" "${pg_dsn}" 2>/dev/null \
@@ -868,6 +876,13 @@ edbdocker_bootstrap_instance() {
   if [ -n "${EDGEDB_SERVER_BOOTSTRAP_COMMAND}" ]; then
     bootstrap_opts+=(--bootstrap-command="${EDGEDB_SERVER_BOOTSTRAP_COMMAND}")
 
+  elif [ -e "/gel-bootstrap.edgeql" ]; then
+    if edbdocker_server_supports "--bootstrap-command-file"; then
+        bootstrap_opts+=(--bootstrap-command-file="/gel-bootstrap.edgeql")
+    else
+        bootstrap_opts+=(--bootstrap-script="/gel-bootstrap.edgeql")
+    fi
+
   elif [ -e "/edgedb-bootstrap.edgeql" ]; then
     if edbdocker_server_supports "--bootstrap-command-file"; then
         bootstrap_opts+=(--bootstrap-command-file="/edgedb-bootstrap.edgeql")
@@ -877,13 +892,13 @@ edbdocker_bootstrap_instance() {
 
   else
     if [ -n "${EDGEDB_SERVER_PASSWORD_HASH}" ]; then
-      if [ "$EDGEDB_SERVER_USER" = "edgedb" ]; then
+      if [ "$EDGEDB_SERVER_USER" = "$DEFAULT_SERVER_USER" ]; then
         bootstrap_cmd="ALTER ROLE ${EDGEDB_SERVER_USER} { SET password_hash := '${EDGEDB_SERVER_PASSWORD_HASH}'; }"
       else
         bootstrap_cmd="CREATE SUPERUSER ROLE ${EDGEDB_SERVER_USER} { SET password_hash := '${EDGEDB_SERVER_PASSWORD_HASH}'; }"
       fi
     elif [ -n "${EDGEDB_SERVER_PASSWORD}" ]; then
-      if [[ "$EDGEDB_SERVER_USER" = "edgedb" ]]; then
+      if [[ "$EDGEDB_SERVER_USER" = "$DEFAULT_SERVER_USER" ]]; then
         bootstrap_cmd="ALTER ROLE ${EDGEDB_SERVER_USER} { SET password := '${EDGEDB_SERVER_PASSWORD}'; }"
       else
         bootstrap_cmd="CREATE SUPERUSER ROLE ${EDGEDB_SERVER_USER} { SET password := '${EDGEDB_SERVER_PASSWORD}'; }"
@@ -924,7 +939,7 @@ edbdocker_bootstrap_instance() {
         "                                                                "
         "For example:                                                    "
         "                                                                "
-        "$ docker run -e EDGEDB_SERVER_PASSWORD_FILE=/pass edgedb/edgedb "
+        "$ docker run -e EDGEDB_SERVER_PASSWORD_FILE=/pass ${BRANDING}/${BRANDING} "
         "                                                                "
         "Alternatively, if doing local development and database security "
         "is not a concern, set the EDGEDB_SERVER_SECURITY environment    "
@@ -1019,7 +1034,12 @@ _edbdocker_bootstrap_cb() {
     fi
   fi
 
-  _edbdocker_bootstrap_run_hooks "/edgedb-bootstrap.d" "${conn_opts[@]}"
+  if [ -d "/gel-bootstrap.d" ]; then
+    _edbdocker_bootstrap_run_hooks "/gel-bootstrap.d" "${conn_opts[@]}"
+  elif [ -d "/edgedb-bootstrap.d" ]; then
+    _edbdocker_bootstrap_run_hooks "/edgedb-bootstrap.d" "${conn_opts[@]}"
+  fi
+
 
   if [ -d "/dbschema" ] && [ "${EDGEDB_DOCKER_APPLY_MIGRATIONS}" != "never" ]; then
     if ! _edbdocker_migrations_cb "" "${conn_opts[@]}"; then
@@ -1027,7 +1047,11 @@ _edbdocker_bootstrap_cb() {
     fi
   fi
 
-  _edbdocker_bootstrap_run_hooks "/edgedb-bootstrap-late.d" "${conn_opts[@]}"
+  if [ -d "/gel-bootstrap-late.d" ]; then
+    _edbdocker_bootstrap_run_hooks "/gel-bootstrap-late.d" "${conn_opts[@]}"
+  elif [ -d "/edgedb-bootstrap-late.d" ]; then
+    _edbdocker_bootstrap_run_hooks "/edgedb-bootstrap-late.d" "${conn_opts[@]}"
+  fi
 }
 
 
@@ -1178,7 +1202,7 @@ edbdocker_log_at_level() {
 # Check if the server supports a given command-line argument.
 edbdocker_server_supports() {
   local srv
-  srv="${EDGEDB_SERVER_BINARY:-edgedb-server}"
+  srv="${EDGEDB_SERVER_BINARY:-$DEFAULT_SERVER_BINARY}"
 
   if "${srv}" --help | grep -- "$1" >/dev/null; then
     return 0
@@ -1193,7 +1217,7 @@ edbdocker_server_supports() {
 #
 # Usage: `edbdocker_run_temp_server callback abort_callback status_var --server-arg=val ...`
 edbdocker_run_temp_server() {
-  local edgedb_pid
+  local server_pid
   local timeout_pid
   local timeout
   local runstate_dir
@@ -1299,7 +1323,7 @@ edbdocker_run_temp_server() {
   else
     env -i "${pg_vars[@]}" "${EDGEDB_SERVER_BINARY}" "${server_opts[@]}" &
   fi
-  edgedb_pid="$!"
+  server_pid="$!"
 
   timeout="$EDGEDB_DOCKER_BOOTSTRAP_TIMEOUT_SEC"
 
@@ -1310,7 +1334,7 @@ edbdocker_run_temp_server() {
     result=1
   }
 
-  status=$(_edbdocker_wait_for_status "$status_file" "$edgedb_pid" "$timeout")
+  status=$(_edbdocker_wait_for_status "$status_file" "$server_pid" "$timeout")
 
   if [ -n "$status_var" ]; then
     local -n status_var_ref="$status_var"
@@ -1373,16 +1397,16 @@ edbdocker_run_temp_server() {
   fi
 
   set +e
-  kill -TERM "$edgedb_pid" 2>/dev/null
-  (sleep 10 ; kill -KILL "$edgedb_pid") &
+  kill -TERM "$server_pid" 2>/dev/null
+  (sleep 10 ; kill -KILL "$server_pid") &
   timeout_pid="$!"
-  wait -n "$edgedb_pid"
+  wait -n "$server_pid"
   ecode=$?
   kill "$timeout_pid" 2>/dev/null
   set -e
 
-  if ps -o pid= -p "$edgedb_pid" >/dev/null; then
-    kill -9 "$edgedb_pid"
+  if ps -o pid= -p "$server_pid" >/dev/null; then
+    kill -9 "$server_pid"
     ecode=124
   fi
 
@@ -1477,7 +1501,7 @@ _edbdocker_print_last_generated_cert_if_needed() {
 
   link_opts+=( "-P" "<published-port>" )
 
-  if [ "${EDGEDB_SERVER_USER}" != "edgedb" ]; then
+  if [ "${EDGEDB_SERVER_USER}" != "$DEFAULT_SERVER_USER" ]; then
     link_opts+=( "-u" "${EDGEDB_SERVER_USER}" )
   fi
 
