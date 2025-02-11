@@ -20,7 +20,7 @@ latest_server_ver() {
 
   jq_query="
      .packages[]
-     | select(.basename == \"edgedb-server\")
+     | select(.basename == \"gel-server\")
      | select(.slot | contains(\"-rc\") | not)
      | select(.architecture == \"$(arch)\")
      | .version_key"
@@ -34,7 +34,7 @@ latest_server_ver() {
     jq_query="
       .packages[]
       | select(.version_key == \"${ver_key}\")
-      | select(.basename == \"edgedb-server\")"
+      | select(.basename == \"gel-server\")"
 
     echo "$index" | jq -r "$jq_query"
   fi
@@ -61,6 +61,8 @@ build_container() {
     buildargs+=(
       --build-arg
       "subdist=${subdist}"
+      --build-arg
+      "branding=gel"
     )
   fi
 

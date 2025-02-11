@@ -82,12 +82,14 @@ edb_gs_show_secrets() (
 
   while IFS="=" read -r k v; do
     map["$k"]=$v
-  done < "/tmp/edgedb/secrets"
+  done < "/tmp/$BRANDING/secrets"
 
   if [ -n "${_EDB_GS_ALL}" ]; then
     for k in "${!map[@]}"; do
       file=${map["$k"]}
-      edb_gs_show_secret "$k" "$file"
+      if [ -n "$file" ]; then
+        edb_gs_show_secret "$k" "$file"
+      fi
     done
   else
     for k in "${_EDB_GS_SECRETS[@]}"; do
