@@ -842,7 +842,7 @@ edbdocker_remote_cluster_is_initialized() {
   local psql
 
   pg_dsn="$1"
-  psql="$(dirname "$(readlink -f /usr/bin/${DEFAULT_SERVER_BINARY})")/psql"
+  psql="$(dirname "$(readlink -f "/usr/bin/${DEFAULT_SERVER_BINARY}")")/psql"
 
   if echo "\\l" \
      | "$psql" "${pg_dsn}" 2>/dev/null \
