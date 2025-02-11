@@ -12,7 +12,7 @@ declare -A _edbdocker_log_levels=(
 edbdocker_setup_shell() {
   set -Eeu -o pipefail
   shopt -s dotglob inherit_errexit nullglob compat"${BASH_COMPAT=42}"
-  : "${EDGEDB_DOCKER_LOG_LEVEL:=${EDGEDB_SERVER_DOCKER_LOG_LEVEL:-info}}"
+  : "${EDGEDB_DOCKER_LOG_LEVEL:=info}"
 
   EDGEDB_DOCKER_LOG_LEVEL="${EDGEDB_DOCKER_LOG_LEVEL,,}"
 
@@ -129,14 +129,6 @@ edbdocker_parse_args() {
         EDGEDB_SERVER_BOOTSTRAP_COMMAND="${1#*=}"
         shift
         ;;
-      --bootstrap-script)
-        _edbdocker_parse_arg "EDGEDB_SERVER_BOOTSTRAP_SCRIPT_FILE" "$1" "$2"
-        shift 2
-        ;;
-      --bootstrap-script=*)
-        EDGEDB_SERVER_BOOTSTRAP_SCRIPT_FILE="${1#*=}"
-        shift
-        ;;
       --bootstrap-command-file)
         _edbdocker_parse_arg "EDGEDB_SERVER_BOOTSTRAP_COMMAND_FILE" "$1" "$2"
         shift 2
@@ -171,10 +163,6 @@ edbdocker_parse_args() {
         ;;
       --http-endpoint-security=*)
         EDGEDB_SERVER_HTTP_ENDPOINT_SECURITY="${1#*=}"
-        shift
-        ;;
-      --generate-self-signed-cert)
-        EDGEDB_SERVER_GENERATE_SELF_SIGNED_CERT="1"
         shift
         ;;
       --tls-cert-mode)
@@ -426,25 +414,9 @@ edbdocker_setup_env() {
   : "${EDGEDB_SERVER_TLS_KEY_FILE:=}"
   : "${EDGEDB_SERVER_JWS_KEY_FILE:=}"
   : "${EDGEDB_SERVER_BOOTSTRAP_COMMAND:=}"
-  : "${EDGEDB_SERVER_BOOTSTRAP_SCRIPT_FILE:=}"
   : "${EDGEDB_SERVER_COMPILER_POOL_MODE:=}"
   : "${EDGEDB_SERVER_COMPILER_POOL_SIZE:=}"
   : "${EDGEDB_SERVER_TENANT_ID:=}"
-
-  if [ -n "${EDGEDB_SERVER_BOOTSTRAP_SCRIPT_FILE:-}" ]; then
-    if [ -n "${EDGEDB_SERVER_BOOTSTRAP_COMMAND_FILE}" ]; then
-      edbdocker_die "ERROR: EDGEDB_SERVER_BOOTSTRAP_COMMAND_FILE and EDGEDB_SERVER_BOOTSTRAP_SCRIPT_FILE are mutually exclusive, but both are set"
-    else
-      msg=(
-        "============================================================"
-        "WARNING: EDGEDB_SERVER_BOOTSTRAP_SCRIPT_FILE is deprecated. "
-        "         Use EDGEDB_SERVER_BOOTSTRAP_COMMAND_FILE instead."
-        "============================================================"
-      )
-      edbdocker_log_at_level "warning" "${msg[@]}"
-      EDGEDB_SERVER_BOOTSTRAP_COMMAND_FILE="${EDGEDB_SERVER_BOOTSTRAP_SCRIPT_FILE}"
-    fi
-  fi
 
   if [ -z "${EDGEDB_SERVER_UID:-}" ]; then
     if [ "$(id -u)" = "0" ]; then
@@ -472,23 +444,6 @@ edbdocker_setup_env() {
     edbdocker_die "ERROR: invalid value for EDGEDB_DOCKER_SHOW_GENERATED_CERT: ${EDGEDB_DOCKER_SHOW_GENERATED_CERT}, supported values are: always, never, default."
   fi
 
-  if [ -n "${EDGEDB_SERVER_SKIP_MIGRATIONS:-}" ]; then
-    if [ -n "${EDGEDB_DOCKER_APPLY_MIGRATIONS}" ]; then
-      if [ "${EDGEDB_DOCKER_APPLY_MIGRATIONS}" = "never" ]; then
-        edbdocker_die "ERROR: EDGEDB_SERVER_SKIP_MIGRATIONS and EDGEDB_DOCKER_APPLY_MIGRATIONS are mutually exclusive, but both are set"
-      fi
-    else
-      msg=(
-        "=========================================================="
-        "WARNING: EDGEDB_SERVER_SKIP_MIGRATIONS is deprecated.     "
-        "         Use EDGEDB_DOCKER_APPLY_MIGRATIONS=never instead."
-        "=========================================================="
-      )
-      edbdocker_log_at_level "warning" "${msg[@]}"
-      EDGEDB_DOCKER_APPLY_MIGRATIONS="never"
-    fi
-  fi
-
   if [ "${EDGEDB_DOCKER_APPLY_MIGRATIONS}" = "default" ]; then
     EDGEDB_DOCKER_APPLY_MIGRATIONS="always"
   elif [ "${EDGEDB_DOCKER_APPLY_MIGRATIONS}" = "always" ] \
@@ -499,56 +454,6 @@ edbdocker_setup_env() {
     edbdocker_die "ERROR: invalid value for EDGEDB_DOCKER_APPLY_MIGRATIONS: ${EDGEDB_DOCKER_APPLY_MIGRATIONS}, supported values are: always, never, default."
   fi
 
-  if [ -n "${EDGEDB_DOCKER_:-}" ]; then
-    msg=(
-      "======================================================="
-      "WARNING: EDGEDB_SERVER_AUTH_METHOD is deprecated.      "
-      "         Use EDGEDB_SERVER_DEFAULT_AUTH_METHOD instead."
-      "======================================================="
-    )
-    edbdocker_log_at_level "warning" "${msg[@]}"
-  fi
-
-  if [ -n "${EDGEDB_SERVER_AUTH_METHOD:-}" ]; then
-    msg=(
-      "======================================================="
-      "WARNING: EDGEDB_SERVER_AUTH_METHOD is deprecated.      "
-      "         Use EDGEDB_SERVER_DEFAULT_AUTH_METHOD instead."
-      "======================================================="
-    )
-    edbdocker_log_at_level "warning" "${msg[@]}"
-  fi
-
-  if [ -n "${EDGEDB_SERVER_POSTGRES_DSN:-}" ]; then
-    if [ -n "${EDGEDB_SERVER_BACKEND_DSN}" ]; then
-      edbdocker_die "ERROR: EDGEDB_SERVER_POSTGRES_DSN and EDGEDB_SERVER_BACKEND_DSN are mutually exclusive, but both are set"
-    else
-      msg=(
-        "======================================================="
-        "WARNING: EDGEDB_SERVER_POSTGRES_DSN is deprecated.      "
-        "         Use EDGEDB_SERVER_BACKEND_DSN instead."
-        "======================================================="
-      )
-      edbdocker_log_at_level "warning" "${msg[@]}"
-      EDGEDB_SERVER_BACKEND_DSN="${EDGEDB_SERVER_POSTGRES_DSN}"
-    fi
-  fi
-
-  if [ -n "${EDGEDB_SERVER_GENERATE_SELF_SIGNED_CERT:-}" ]; then
-    if [ -n "${EDGEDB_SERVER_TLS_CERT_MODE}" ]; then
-      edbdocker_die "ERROR: EDGEDB_SERVER_GENERATE_SELF_SIGNED_CERT and EDGEDB_SERVER_TLS_CERT_MODE are mutually exclusive, but both are set"
-    else
-      msg=(
-        "======================================================="
-        "WARNING: EDGEDB_SERVER_GENERATE_SELF_SIGNED_CERT is deprecated.      "
-        "         Use EDGEDB_SERVER_TLS_CERT_MODE instead."
-        "======================================================="
-      )
-      edbdocker_log_at_level "warning" "${msg[@]}"
-      EDGEDB_SERVER_TLS_CERT_MODE="generate_self_signed"
-    fi
-  fi
-
   if [ "${VERSION_MAJOR}" -ge 6 ]; then
     DEFAULT_SERVER_USER="admin"
   else
@@ -557,7 +462,7 @@ edbdocker_setup_env() {
 
   edbdocker_lookup_env_var "EDGEDB_SERVER_PORT" "5656"
   edbdocker_lookup_env_var "EDGEDB_SERVER_BIND_ADDRESS" "0.0.0.0,::"
-  edbdocker_lookup_env_var "EDGEDB_SERVER_DEFAULT_AUTH_METHOD" "${EDGEDB_SERVER_AUTH_METHOD-default}"
+  edbdocker_lookup_env_var "EDGEDB_SERVER_DEFAULT_AUTH_METHOD" "default"
   edbdocker_lookup_env_var "EDGEDB_SERVER_USER" "$DEFAULT_SERVER_USER"
   edbdocker_lookup_env_var "EDGEDB_SERVER_DATABASE"
   edbdocker_lookup_env_var "EDGEDB_SERVER_DEFAULT_BRANCH"
@@ -624,18 +529,8 @@ edbdocker_setup_env() {
     edbdocker_die "ERROR: EDGEDB_SERVER_PASSWORD and EDGEDB_SERVER_PASSWORD_HASH are mutually exclusive, but both are set"
   fi
 
-  if [ -n "${EDGEDB_SERVER_BOOTSTRAP_SCRIPT_FILE}" ] && [ -n "${EDGEDB_SERVER_BOOTSTRAP_COMMAND}" ]; then
-    edbdocker_die "ERROR: EDGEDB_SERVER_BOOTSTRAP_SCRIPT_FILE and EDGEDB_SERVER_BOOTSTRAP_COMMAND are mutually exclusive, but both are set"
-  fi
-
-  if [ -n "${EDGEDB_SERVER_ALLOW_INSECURE_HTTP_CLIENTS:-}" ]; then
-    if [ -z "${EDGEDB_SERVER_HTTP_ENDPOINT_SECURITY}" ]; then
-      EDGEDB_SERVER_HTTP_ENDPOINT_SECURITY="optional"
-    elif [ "${EDGEDB_SERVER_HTTP_ENDPOINT_SECURITY}" = "optional" ]; then
-      :
-    else
-      edbdocker_die "ERROR: EDGEDB_SERVER_ALLOW_INSECURE_HTTP_CLIENTS and EDGEDB_SERVER_HTTP_ENDPOINT_SECURITY are mutually exclusive, but both are set"
-    fi
+  if [ -z "${GEL_SERVER_HTTP_ENDPOINT_SECURITY}" ]; then
+    GEL_SERVER_HTTP_ENDPOINT_SECURITY="optional"
   fi
 
   if [ "${EDGEDB_SERVER_SECURITY}" = "insecure_dev_mode" ]; then
