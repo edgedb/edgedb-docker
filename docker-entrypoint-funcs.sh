@@ -38,7 +38,7 @@ edbdocker_is_server_command() {
 edbdocker_run_regular_command() {
   if [ "${1:0:1}" = '-' ]; then
     set -- "$DEFAULT_SERVER_BINARY" "$@"
-  else
+  elif [ "$1" = "server" ]; then
     set -- "$DEFAULT_SERVER_BINARY" "${@:1}"
   fi
 
