@@ -4,11 +4,11 @@ ARG version
 ARG exact_version
 ARG subdist
 
-ENV GOSU_VERSION 1.11
-ENV BRANDING ${branding}
-ENV DEFAULT_OS_USER ${branding}
-ENV DEFAULT_SERVER_BINARY ${branding}-server-${version}
-ENV VERSION ${version}
+ENV GOSU_VERSION=1.11
+ENV BRANDING=${branding}
+ENV DEFAULT_OS_USER=${branding}
+ENV DEFAULT_SERVER_BINARY=${branding}-server-${version}
+ENV VERSION=${version}
 
 SHELL ["/bin/bash", "-c"]
 
@@ -61,7 +61,7 @@ export DEBIAN_FRONTEND=noninteractive; \
 && apt-get purge -y --auto-remove \
 && rm -rf /var/lib/apt/lists/*
 
-ENV LANG en_US.utf8
+ENV LANG=en_US.utf8
 
 EXPOSE 5656
 
