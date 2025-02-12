@@ -640,8 +640,6 @@ edbdocker_lookup_env_var() {
   local old_var_val
   local old_file_var_val
 
-  # TODO add back GEL_PASSWORD and GEL_PORT support
-
   var="$1"
   file_var="${var}_FILE"
   alt_var="${var}_ENV"
@@ -672,13 +670,12 @@ edbdocker_lookup_env_var() {
     edbdocker_log_at_level "warning" "${msg[@]}"
 
     if [ -n "${var_val}" ]; then
-      echo "${var}" "${old_var}"
       duplicate_envvar_warning "${var}"
     else
-        var_val="${old_var_val}"
-        var_origin="$old_var"
-        unset "$old_var"
+      var_val="${old_var_val}"
+      var_origin="$old_var"
     fi
+    unset "$old_var"
   fi
 
   if [ -n "${old_file_var_val}" ]; then
@@ -690,30 +687,102 @@ edbdocker_lookup_env_var() {
     edbdocker_log_at_level "warning" "${msg[@]}"
 
     if [ -n "${file_var_val}" ]; then
-      echo "${file_var}" "${old_file_var}"
       duplicate_envvar_warning "${file_var}"
     else
       file_var_val="${old_file_var_val}"
       file_var_origin="$old_file_var"
-      unset "$old_file_var"
     fi
+    unset "$old_file_var"
   fi
 
   if [ -n "${old_alt_var_val}" ]; then
     msg=(
-      "=============================================================== "
+      "============================================================= "
       "WARNING: ${old_alt_var} is deprecated use ${alt_var} instead. "
-      "=============================================================== "
+      "============================================================= "
     )
     edbdocker_log_at_level "warning" "${msg[@]}"
 
     if [ -n "${alt_var_val}" ]; then
-      echo "${alt_var}" "${old_alt_var}"
       duplicate_envvar_warning "${alt_var}"
     else
       alt_var_val="${old_alt_var_val}"
       alt_var_origin="$old_alt_var"
-      unset "$old_alt_var"
+    fi
+    unset "$old_alt_var"
+  fi
+
+  if [ "$var" == "GEL_SERVER_PASSWORD" ] || [ "$var" == "GEL_SERVER_PORT" ]; then
+    client_var="${var/_SERVER_/_}"
+    client_var_val="${!client_var:-}"
+
+    client_file_var="${client_var}_FILE"
+    client_file_var_val="${!client_file_var:-}"
+
+    old_client_var="${old_var/_SERVER_/_}"
+    old_client_var_val="${!old_client_var:-}"
+
+    old_client_file_var="${old_client_var}_FILE"
+    old_client_file_var_val="${!old_client_file_var:-}"
+
+    # keep track of variable names to use in error messages
+    client_var_origin="$client_var"
+    client_file_var_origin="$client_file_var"
+
+    if [ -n "${old_client_var_val}" ]; then
+      msg=(
+        "=================================================================== "
+        "WARNING: ${old_client_var} is deprecated use ${client_var} instead. "
+        "=================================================================== "
+      )
+      edbdocker_log_at_level "warning" "${msg[@]}"
+
+      if [ -n "${client_var_val}" ]; then
+        duplicate_envvar_warning "${client_var}"
+      else
+        client_var_val="${old_client_var_val}"
+        client_var_origin="$old_client_var"
+      fi
+      unset "$old_client_var"
+    fi
+
+    if [ -n "$client_var_val" ]; then
+      if [ -n "$var_val" ]; then
+        edbdocker_die \
+          "ERROR: ${var_origin} and ${client_var_origin} are exclusive, but both are set."
+      else
+        var_val="$client_var_val"
+        var_origin="$client_var_origin"
+        unset "$client_var"
+      fi
+    fi
+
+    if [ -n "${old_client_file_var_val}" ]; then
+      msg=(
+        "============================================================================= "
+        "WARNING: ${old_client_file_var} is deprecated use ${client_file_var} instead. "
+        "============================================================================= "
+      )
+      edbdocker_log_at_level "warning" "${msg[@]}"
+
+      if [ -n "${client_file_var_val}" ]; then
+        duplicate_envvar_warning "${client_file_var}"
+      else
+        client_file_var_val="${old_client_file_var_val}"
+        client_file_var_origin="$old_client_file_var"
+      fi
+      unset "$old_client_file_var"
+    fi
+
+    if [ -n "$client_file_var_val" ]; then
+      if [ -n "$file_var_val" ]; then
+        edbdocker_die \
+          "ERROR: ${file_var_origin} and ${client_file_var_origin} are exclusive, but both are set."
+      else
+        file_var_val="$client_file_var_val"
+        file_var_origin="$client_file_var_origin"
+        unset "$client_file_var"
+      fi
     fi
   fi
 
@@ -1097,15 +1166,6 @@ edbdocker_log_no_tls_cert() {
     "======================================================================="
   )
   edbdocker_log_at_level "error" "${msg[@]}"
-}
-
-
-edbdocker_env_var_deprecated() {
-  # TODO this function may not be needed
-  local v
-  v="${1%_FILE}"
-  v="${v#EDGEDB_}"
-  [ "${v}" != "HOST" ] && [ "${v}" != "PORT" ] && [ "${v}" != "PASSWORD" ]
 }
 
 
