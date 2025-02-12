@@ -933,8 +933,8 @@ edbdocker_bootstrap_instance() {
         "                          WARNING                               "
         "                          -------                               "
         "                                                                "
-        "GEL_SERVER_DEFAULT_AUTH_METHOD is set to 'Trust'.  This will "
-        "allow unauthenticated access to this EdgeDB instance for all who"
+        "GEL_SERVER_DEFAULT_AUTH_METHOD is set to 'Trust'.  This will    "
+        "allow unauthenticated access to this Gel instance for all who   "
         "have access to the database port! This might include other      "
         "containers or processes on the same host and, if port ${GEL_SERVER_PORT}"
         "is bound to an accessible interface on the host, other machines "
@@ -942,8 +942,8 @@ edbdocker_bootstrap_instance() {
         "                                                                "
         "Use only for DEVELOPMENT and TESTING in a known environment     "
         "without sensitive data.  Otherwise, it is strongly recommended  "
-        "to use password authentication via the GEL_SERVER_PASSWORD   "
-        "or GEL_SERVER_PASSWORD_HASH environment variables.           "
+        "to use password authentication via the GEL_SERVER_PASSWORD      "
+        "or GEL_SERVER_PASSWORD_HASH environment variables.              "
         "================================================================"
       )
       edbdocker_log_at_level "warning" "${msg[@]}"
@@ -953,9 +953,9 @@ edbdocker_bootstrap_instance() {
         "                           ERROR                                "
         "                           -----                                "
         "                                                                "
-        "The EdgeDB instance at the specified location is not initialized"
+        "The Gel instance at the specified location is not initialized   "
         "and superuser password has not been specified. Please set either"
-        "the GEL_SERVER_PASSWORD or the GEL_SERVER_PASSWORD_FILE   "
+        "the GEL_SERVER_PASSWORD or the GEL_SERVER_PASSWORD_FILE         "
         "environment variable to a non-empty value.                      "
         "                                                                "
         "For example:                                                    "
@@ -963,9 +963,9 @@ edbdocker_bootstrap_instance() {
         "$ docker run -e GEL_SERVER_PASSWORD_FILE=/pass ${BRANDING}/${BRANDING} "
         "                                                                "
         "Alternatively, if doing local development and database security "
-        "is not a concern, set the GEL_SERVER_SECURITY environment    "
+        "is not a concern, set the GEL_SERVER_SECURITY environment       "
         "variable to 'insecure_dev_mode' value, which would disable      "
-        "password authentication and let this EdgeDB server use a self-  "
+        "password authentication and let this Gel server use a self-     "
         "signed TLS certificate.                                         "
       )
       edbdocker_die "${msg[@]}"
@@ -977,9 +977,9 @@ edbdocker_bootstrap_instance() {
   fi
 
   if [ -n "${GEL_SERVER_BACKEND_DSN}" ]; then
-    edbdocker_log_at_level "info" "Bootstrapping EdgeDB instance on remote Postgres cluster..."
+    edbdocker_log_at_level "info" "Bootstrapping Gel instance on remote Postgres cluster..."
   else
-    edbdocker_log_at_level "info" "Bootstrapping EdgeDB instance on the local volume..."
+    edbdocker_log_at_level "info" "Bootstrapping Gel instance on the local volume..."
   fi
 
   edbdocker_run_temp_server \
@@ -1157,11 +1157,11 @@ edbdocker_log_no_tls_cert() {
     "                                 ERROR                                 "
     "                                 -----                                 "
     "                                                                       "
-    "EdgeDB server requires a TLS certificate and a corresponding private   "
+    "Gel server requires a TLS certificate and a corresponding private      "
     "key to operate.  You can either provide them by setting the            "
-    "GEL_SERVER_TLS_CERT_FILE and GEL_SERVER_TLS_KEY_FILE environment "
+    "GEL_SERVER_TLS_CERT_FILE and GEL_SERVER_TLS_KEY_FILE environment       "
     "variables to an existing certificate and private key, or set           "
-    "GEL_SERVER_TLS_CERT_MODE=generate_self_signed to generate           "
+    "GEL_SERVER_TLS_CERT_MODE=generate_self_signed to generate              "
     "a self-signed certificate automatically.                               "
     "======================================================================="
   )
@@ -1527,7 +1527,7 @@ _edbdocker_print_last_generated_cert_if_needed() {
     "A self-signed TLS certificate has been generated and placed in  "
     "'${tls_cert_file}' in this container.                           "
     "                                                                "
-    "If you have the EdgeDB CLI installed on the host system, you can"
+    "If you have the Gel CLI installed on the host system, you can   "
     "persist the authentication credentials and the certificate by   "
     "running:                                                        "
     "                                                                "
