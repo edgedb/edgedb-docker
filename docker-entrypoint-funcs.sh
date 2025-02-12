@@ -1364,11 +1364,10 @@ edbdocker_run_temp_server() {
     port=$(echo "$srvdata" | jq -r ".port")
     tls_cert_file=$(echo "$srvdata" | jq -r '.tls_cert_file // ""')
 
-    # TODO connection options should be changed to GEL_
     conn_opts=(
-      EDGEDB_HOST="127.0.0.1"
-      EDGEDB_PORT="${port}"
-      EDGEDB_CLIENT_TLS_SECURITY="insecure"
+      GEL_HOST="127.0.0.1"
+      GEL_PORT="${port}"
+      GEL_CLIENT_TLS_SECURITY="insecure"
     )
 
     if [ "${VERSION_MAJOR}" -lt 5 ]; then
@@ -1379,30 +1378,25 @@ edbdocker_run_temp_server() {
 
     if [ -n "${tls_cert_file}" ]; then
       conn_opts+=(
-        EDGEDB_TLS_CA_FILE="${tls_cert_file}"
+        GEL_TLS_CA_FILE="${tls_cert_file}"
       )
     fi
 
     if [ -n "${GEL_SERVER_USER}" ]; then
       conn_opts+=(
-        EDGEDB_USER="${GEL_SERVER_USER}"
+        GEL_USER="${GEL_SERVER_USER}"
       )
     fi
 
     if [ -n "${GEL_SERVER_PASSWORD}" ]; then
       conn_opts+=(
-        EDGEDB_PASSWORD="${GEL_SERVER_PASSWORD}"
+        GEL_PASSWORD="${GEL_SERVER_PASSWORD}"
       )
     fi
 
     http_status=$(curl -o /dev/null -s -w "%{http_code}" -k "https://127.0.0.1:${port}/server/status/alive")
     if [ "$http_status" = "404" ]; then
-      # older server without alive check
-      if ! edbdocker_cli "${conn_opts[@]}" -- query "SELECT 1" >/dev/null; then
-          status=""
-      else
-          $callback "$status" "${conn_opts[@]}" || result=$?
-      fi
+      $callback "$status" "${conn_opts[@]}" || result=$?
     elif [ "$http_status" = "200" ]; then
       $callback "$status" "${conn_opts[@]}" || result=$?
     else
