@@ -23,4 +23,4 @@ built on top of PostgreSQL, featuring:
 - built-in support for schema migrations;
 - native GraphQL support.
 
-Try the [quickstart](https://www.edgedb.com/docs/guides/quickstart) or jump into the [docs](https://www.edgedb.com/) to get started with Gel.
+Try the [quickstart](https://docs.geldata.com/guides/quickstart) or jump into the [docs](https://www.geldata.com/) to get started with Gel.
