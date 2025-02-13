@@ -147,6 +147,7 @@ edbdocker_parse_args() {
         shift 2
         ;;
       --bootstrap-command-file=*)
+        # shellcheck disable=SC2034
         GEL_SERVER_BOOTSTRAP_COMMAND_FILE="${1#*=}"
         shift
         ;;
