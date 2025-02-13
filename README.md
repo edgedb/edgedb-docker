@@ -14,7 +14,7 @@ manage local instances.
 
 ## What is Gel?
 
-[Gel](https://www.edgedb.com) is an open-source object-relational database
+[Gel](https://www.geldata.com) is an open-source object-relational database
 built on top of PostgreSQL, featuring:
 
 - strict, object-oriented typed schema;
