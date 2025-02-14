@@ -18,12 +18,12 @@ teardown() {
 
   run docker exec "$container_id" gel-show-secrets.sh \
     --format=toml --all
-  [[ ${lines[0]} = EDGEDB_SERVER_* ]]
+  [[ ${lines[0]} = GEL_SERVER_* ]]
 
   run docker exec "$container_id" gel-show-secrets.sh \
-    --format=raw EDGEDB_SERVER_TLS_CERT
+    --format=raw GEL_SERVER_TLS_CERT
   [[ ${lines[0]} = "-----BEGIN CERTIFICATE-----" ]]
 
   run docker exec "$container_id" gel-show-secrets.sh \
-    --format=shell EDGEDB_SERVER_TLS_CERT EDGEDB_SERVER_TLS_KEY
+    --format=shell GEL_SERVER_TLS_CERT GEL_SERVER_TLS_KEY
 }
